@@ -1,0 +1,19 @@
+{
+  "id": "swade-stat-block-importer",
+  "title": "SWADE Stat Block Importer",
+  "description": "Import/export Pinnacle SWADE stat blocks. Includes a multi-source named-list library for AI-assisted character creation.",
+  "authors": [{"name": "Jack_Sands (Erich)", "discord": "jack_sands"}],
+  "version": "2.0.0",
+  "compatibility": {"minimum": "14", "verified": "14"},
+  "relationships": {"systems": [{"id": "swade", "type": "system", "compatibility": {"minimum": "6.0.0"}}]},
+  "esmodules": ["main.mjs"],
+  "languages": [{"lang": "en", "name": "English", "path": "lang/en.json"}],
+  "packs": [{
+    "name": "sbi-library",
+    "label": "SBI Reference Library",
+    "path": "packs/sbi-library",
+    "type": "JournalEntry",
+    "system": "swade",
+    "ownership": {"PLAYER": "NONE", "ASSISTANT": "OBSERVER"}
+  }]
+}
