@@ -248,7 +248,74 @@ export class SelectCompendiums extends foundry.applications.api.ApplicationV2 {
   }
 }
 
-// ── TokenSettingsApp (unchanged) ──────────────────────────────────────
+// ── ImageUploadSettingsApp ────────────────────────────────────────────
+export class ImageUploadSettingsApp extends foundry.applications.api.ApplicationV2 {
+  static DEFAULT_OPTIONS = {
+    id:       `${MODULE_ID}.imageUploadSettings`,
+    window:   { title: 'Actor Image Upload Path' },
+    position: { width: 500 },
+  };
+
+  _handlersInstalled = false;
+
+  async _renderHTML(context, options) {
+    const current     = getSetting(S.imgUploadPath) ?? '';
+    const defaultPath = `worlds/${game.world?.id ?? '[world-id]'}/actors`;
+    const div = document.createElement('div');
+    div.id = 'sbi-iup-root';
+    div.style.cssText = 'padding:12px;font-size:13px;';
+    div.innerHTML = `
+      <p style="margin:0 0 10px;opacity:.75;font-size:12px;">
+        Folder where dropped images are saved in Foundry's file system.<br>
+        Leave blank to use the default: <code style="font-size:11px;">${defaultPath}</code>
+      </p>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="text" id="iup-path" value="${current}" placeholder="${defaultPath}"
+               style="flex:1;font-size:12px;padding:4px 6px;font-family:monospace;border-radius:3px;"/>
+        <button type="button" id="iup-browse" title="Browse Foundry folders"
+                style="padding:4px 10px;font-size:14px;cursor:pointer;border-radius:3px;">📁 Browse</button>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;border-top:1px solid rgba(255,255,255,.1);padding-top:10px;">
+        <button type="button" id="iup-clear" style="font-size:12px;padding:3px 10px;opacity:.7;cursor:pointer;border-radius:3px;">✕ Clear (use default)</button>
+        <button type="button" id="iup-save"  style="font-size:12px;padding:3px 14px;cursor:pointer;border-radius:3px;">💾 Save</button>
+      </div>`;
+    return div;
+  }
+
+  _replaceHTML(result, content, options) {
+    this._handlersInstalled = false;
+    content.replaceChildren(result);
+  }
+
+  _onRender(context, options) {
+    if (this._handlersInstalled) return;
+    this._handlersInstalled = true;
+    const pathInput = this.element.querySelector('#iup-path');
+
+    // 📁 Browse: open Foundry FilePicker in folder mode
+    this.element.querySelector('#iup-browse')?.addEventListener('click', () => {
+      const current = pathInput?.value?.trim() || `worlds/${game.world?.id ?? ''}/actors/`;
+      const fp = new FilePicker({
+        type:     'folder',
+        current,
+        callback: (path) => { if (pathInput) pathInput.value = path; },
+      });
+      fp.render(true);
+    });
+
+    this.element.querySelector('#iup-clear')?.addEventListener('click', () => {
+      if (pathInput) pathInput.value = '';
+    });
+
+    this.element.querySelector('#iup-save')?.addEventListener('click', async () => {
+      await setSetting(S.imgUploadPath, pathInput?.value?.trim() ?? '');
+      uiInfo('Image upload path saved.');
+      this.close();
+    });
+  }
+}
+
+// ── TokenSettingsApp ──────────────────────────────────────────────────
 export class TokenSettingsApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
     id:       `${MODULE_ID}.tokenSettings`,

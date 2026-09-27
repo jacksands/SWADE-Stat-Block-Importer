@@ -1,7 +1,7 @@
 // main.mjs — entry point for swade-stat-block-importer (V14 / SWADE v6+)
 import { MODULE_ID, S, loc, uiInfo, uiError, getSetting, setSetting, injectCSS } from './utils.mjs';
 import { setAllPacks, getAllActiveCompendiums } from './lib/compendium-ops.mjs';
-import { SelectCompendiums, TokenSettingsApp } from './apps/settings-apps.mjs';
+import { SelectCompendiums, TokenSettingsApp, ImageUploadSettingsApp } from './apps/settings-apps.mjs';
 import { SwadeImporterApp, openImporterDialog } from './apps/importer-app.mjs';
 import { InstructionsApp, openInstructions } from './apps/instructions-app.mjs';
 import { migrateOldSettings } from './library/store.mjs';
@@ -43,9 +43,7 @@ async function registerSettings() {
     { key: S.twoHandsNotation,          type: String,  default: 'two hands|two-handed', config: true, scope: 'world', name: loc('sbi.settings.TwoHandsLabel'), hint: loc('sbi.settings.TwoHandsHint') },
     { key: S.additionalTraits,          type: String,  default: '',      config: true,  scope: 'world', name: loc('sbi.settings.AdditionalTraits'), hint: loc('sbi.settings.AdditionalTraitsHint') },
     { key: S.renderSheet,               type: Boolean, default: false,   config: true,  scope: 'world', name: loc('sbi.settings.RenderSheet') },
-    { key: S.imgUploadPath,             type: String,  default: '',      config: true,  scope: 'world',
-      name: 'Actor Image Upload Path',
-      hint: `Folder where dropped images are uploaded in Foundry's file system. Leave blank to use the default: worlds/${game.world?.id ?? '[world-id]'}/actors` },
+    { key: S.imgUploadPath, type: String, default: '', config: false, scope: 'world' },
     // Legacy ref settings — kept for migration to sbiLibrary; not shown in config UI
     { key: S.refEdges,                  type: String,  default: '',      config: false, scope: 'world' },
     { key: S.refPowers,                 type: String,  default: '',      config: false, scope: 'world' },
@@ -54,6 +52,12 @@ async function registerSettings() {
     { key: S.sbiLibrary,                type: Object,  default: {},      config: false, scope: 'world' },
   ];
   for (const def of defs) game.settings.register(MODULE_ID, def.key, def);
+
+  game.settings.registerMenu(MODULE_ID, 'imageUploadMenu', {
+    name: 'Actor Image Upload Path', label: '📁 Browse…',
+    hint: 'Set the Foundry folder where dropped images are uploaded. Click to browse.',
+    icon: 'fas fa-folder-open', type: ImageUploadSettingsApp, restricted: false,
+  });
 }
 
 // ── Foundry lifecycle hooks ───────────────────────────────────────────

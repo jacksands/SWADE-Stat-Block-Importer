@@ -1,7 +1,7 @@
 // apps/importer-app.mjs — SwadeImporterApp
 import { MODULE_ID, S, loc, uiInfo, uiError, getSetting, setSetting, injectCSS, SBI_CSS,
          isEmpty } from '../utils.mjs';
-import { getFolderId, getAllActorFolders, getAllActiveCompendiums } from '../lib/compendium-ops.mjs';
+import { getFolderId, getAllActiveCompendiums } from '../lib/compendium-ops.mjs';
 import { buildAndImport } from '../lib/builder.mjs';
 import { actorToStatBlock, analyzeStatBlock, renderAnalysis, analyzeVehicleStatBlock, renderVehicleAnalysis } from '../lib/exporter.mjs';
 import { isVehicleStatBlock } from '../lib/parser.mjs';
@@ -29,7 +29,7 @@ class SwadeImporterApp extends foundry.applications.api.ApplicationV2 {
       vision:      tokenDefs.vision ?? false,
       visionRange: tokenDefs.visionRange ?? 0,
       visionAngle: tokenDefs.visionAngle ?? 360,
-      lastFolder:  getSetting(S.lastSaveFolder) ?? '',
+      lastFolder:  '',
     };
   }
 
@@ -139,7 +139,7 @@ class SwadeImporterApp extends foundry.applications.api.ApplicationV2 {
     const settings = {
       actorType:  el.querySelector('input[name="sbi-actorType"]:checked')?.value ?? 'npc',
       isWildCard: !!el.querySelector('#sbi-isWildCard')?.checked,
-      saveFolder: el.querySelector('#sbi-saveFolder')?.value ?? '',
+      saveFolder: '',
       img:        this._imageSrc || (el.querySelector('#sbi-img-url')?.value?.trim() || ''),
       tokenSettings: {
         disposition: parseInt(el.querySelector('input[name="sbi-disposition"]:checked')?.value ?? '-1'),
@@ -148,7 +148,6 @@ class SwadeImporterApp extends foundry.applications.api.ApplicationV2 {
         visionAngle: parseInt(el.querySelector('#sbi-visionAngle')?.value ?? '360'),
       },
     };
-    await setSetting(S.lastSaveFolder, settings.saveFolder);
     await buildAndImport(settings, el.querySelector('#sbi-statblock')?.value ?? '');
   }
 
@@ -289,8 +288,7 @@ class SwadeImporterApp extends foundry.applications.api.ApplicationV2 {
   }
 
   _buildHTML(ctx) {
-    const chk     = (a, b) => a == b ? 'checked' : '';
-    const folders = getAllActorFolders().map(f => `<option value="${f}" ${ctx.lastFolder === f ? 'selected' : ''}>${f}</option>`).join('');
+    const chk = (a, b) => a == b ? 'checked' : '';
     return `
 <div class="sbi-tab-header">
   <div class="sbi-tabs">
@@ -319,9 +317,6 @@ class SwadeImporterApp extends foundry.applications.api.ApplicationV2 {
     <label><input type="checkbox" id="sbi-vision" ${ctx.vision?'checked':''}/> Has Vision</label>
     <label>Range <input type="number" id="sbi-visionRange" value="${ctx.visionRange}" style="width:56px"/></label>
     <label>Angle <input type="number" id="sbi-visionAngle" value="${ctx.visionAngle}" style="width:56px" max="360"/></label>
-  </div>
-  <div class="fg"><label>Folder</label>
-    <select id="sbi-saveFolder" style="flex:1;"><option value="">— no folder —</option>${folders}</select>
   </div>
   <div class="fg" style="align-items:center;gap:6px;">
     <label style="white-space:nowrap;">Actor Image</label>
