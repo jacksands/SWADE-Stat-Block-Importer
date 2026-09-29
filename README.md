@@ -162,7 +162,7 @@ Notes: Standard four-door automobile.
 
 ## 📚 Reference library
 
-Built-in, fully editable lists from **SWADE Core Rulebook v5.7**:
+Built-in, fully editable lists from from free to use sources compatible with **SWADE Core Rulebook v5.7** rules:
 
 **Skills** · **Edges** · **Powers** · **Special Abilities** · **Hindrances** · **Races**
 
