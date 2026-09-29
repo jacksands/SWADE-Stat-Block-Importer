@@ -16,6 +16,25 @@ Turn a pasted stat block into a fully populated SWADE actor — or hand your cam
 
 ## ✨ What it does
 
+The module has two main parts, plus a third possibility that’s a bonus.
+
+- **Basic part:** it imports characters using the most standard statblocks, like Pinnacle/SavagedUS, etc.
+
+- **Part 2:** there’s an area that lets you take the material you already have + your setting instructions (standard or not) and put it all together into a “big text block.” This big text block teaches the AI how to build a SWADE character in your setting and using your sources. Then you just paste the big text block into the AI and write something like:
+  - “Create a player character who is an elf barbarian, half-drunk but honorable, level 1.” or
+  - “Build a veteran NPC, cyberpunk, German, with PTSD.”
+
+  The AI will try to build it already in the format the importer knows, using the information you gave it.
+
+- **And the third:** if you feed the AI the information and give it a screenshot or paste in text from an NPC or PC — like a photo of a character sheet or a screenshot of a monster you found online — it’s quite likely it can turn that into a statblock importable by the module, and then you just use it.
+
+The idea is to help create characters quickly, especially disposable NPCs, without having to build everything from scratch. And, of course, you can also use the statblock to import ready-made characters from sources that sometimes aren’t compatible.
+
+It does not replace the GM/player building the character!!   You should always check the result!!!
+
+
+
+
 | | |
 |---|---|
 | ⬇ **Import** | Paste a SWADE stat block (Pinnacle, Savaged.us plain/Markdown/JSON) → **Analyze** → **Import**. Creates actors with attributes, skills, edges, hindrances, powers, weapons, armor, gear, special abilities and more. Vehicles too. |
