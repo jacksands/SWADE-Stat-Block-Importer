@@ -1,110 +1,79 @@
-# SWADE Stat Block Importer
+<div align="center">
 
-**A Foundry VTT module for Savage Worlds Adventure Edition (SWADE v6+)**
+# 📋 SWADE Stat Block Importer
 
-Import stat blocks directly into your world as fully populated SWADE actors. Supports multiple formats, AI-assisted character creation, and a built-in reference library for Edges, Powers, Skills, Hindrances, and Races.
+**Import · Export · AI-assisted creation — for Savage Worlds Adventure Edition**
 
----
+[![Foundry VTT](https://img.shields.io/badge/Foundry-V14-8b5cf6?style=flat-square)](https://foundryvtt.com)
+[![SWADE](https://img.shields.io/badge/SWADE-6.0.0%2B-c0392b?style=flat-square)](https://peginc.com)
+[![Version](https://img.shields.io/badge/version-2.1.0-d4a574?style=flat-square)](#)
 
-## Features
+Turn a pasted stat block into a fully populated SWADE actor — or hand your campaign rules to an AI and get one back.
 
-### Import
-- Paste any supported stat block format and click **Analyze** to preview detected fields, then **Import** to create the actor.
-- Supported formats (auto-detected):
-  - **Pinnacle (PEG) standard** — official format from all SWADE publications
-  - **Savaged.us plain text** — copy the Statblock section from savaged.us (with or without the Analyzer header)
-  - **Savaged.us Markdown** — the Markdown export from the savaged.us character builder
-  - **Savaged.us JSON** — paste the raw JSON export; image URL is auto-detected and fills the image field
-- Imports: attributes, skills, edges, hindrances, powers, weapons, armor, shields, gear, special abilities, cyberware, languages, and currency
-- Wild Card detection from the `[WC]` prefix
-- Actor image: drop a local file (uploaded to Foundry's file system), browse with Foundry's file picker, or paste a URL / Foundry path
-- Actor type: NPC, Character, or Vehicle
-
-### Vehicle Import
-- Detects vehicle stat blocks automatically (via `Acc/Top Speed:` / `Handling:` / `Crew:` labels)
-- Maps vehicle-specific fields: handling, top speed, toughness, crew, driver skill, mods, cargo, and cost
-- Weapons and special abilities on vehicles are also imported
-
-### Export
-- Export any existing SWADE actor back to a Pinnacle-format stat block for sharing, editing, or feeding back to an AI
-
-### Instructions & Reference Window
-Full in-app reference with:
-- **Quick Start** — step-by-step guide and accepted format list
-- **AI Creation** — step-by-step workflow for using an external AI to generate characters
-- **Setting Rules** — save named rule sets for different campaign settings (attribute points, skill points, core skills, homebrew notes)
-- **Skills / Edges / Powers / Abilities / Hindrances / Races / Items** — editable reference lists with defaults based on SWADE Core Rulebook v5.7
-- **Library to Use** — choose which sources (Default, Compendium, Named Lists) are included in each Copy for AI action
-- **📋 Copy All for AI** — single button that assembles setting rules + format instructions + all reference lists into one clipboard paste for your AI
+</div>
 
 ---
 
-## Installation
+## ✨ What it does
 
-### Method 1: Foundry Module Manager (recommended)
-1. In Foundry, go to **Add-on Modules → Install Module**
-2. Paste the manifest URL:
-   ```
-   https://raw.githubusercontent.com/jacksands/SWADE-Stat-Block-Importer/refs/heads/main/module.json
-   ```
-3. Click **Install**, then enable the module in your world
-
-### Method 2: Manual
-1. Download the [latest release](https://github.com/jacksands/SWADE-Stat-Block-Importer/archive/refs/heads/main.zip)
-2. Extract to your Foundry `Data/modules/` folder as `swade-stat-block-importer`
-3. Restart Foundry and enable in Game Settings → Manage Modules
-
----
-
-## Usage
-
-### Importing a Stat Block
-
-1. Open the importer from the **Actors sidebar** (the import icon) or a macro calling `openImporterDialog()`
-2. Set Actor Type (NPC / Character / Vehicle) and Wild Card if needed
-3. Optionally add an image: drop a file onto the image zone, click 📁 to browse, or paste a URL
-4. Paste the stat block into the text area
-5. Click **🔍 Analyze** — check the summary for format detection and any warnings
-6. Click **⬇ Import** — the actor is created in your world
-
-### AI-Assisted Character Creation
-
-1. Open **📖 Help** → **AI Creation** tab for the full workflow
-2. Configure your **Setting Rules** tab (attribute points, skill points, core skills for your campaign)
-3. Review reference lists in **Skills**, **Edges**, **Powers**, **Hindrances**, **Races** tabs — use **Library to Use** to select sources
-4. Mark tabs you don't need as **Excluded from Copy All** (e.g., Powers for a non-magical campaign)
-5. Click **📋 Copy All for AI** — paste into your AI assistant (ChatGPT, Claude, etc.)
-6. Describe the character you want; ask for SWADE Pinnacle format output
-7. Paste the result back into the importer
-
-### Compendiums to Search
-
-In **Game Settings → SWADE Stat Block Importer → Compendiums to Search**:
-- Select which compendiums are searched when matching item names during import
-- Compendiums are grouped by module with collapse/expand and cascade selection
-- Without configured compendiums, items are created blank (no artwork or descriptions)
-- Recommended: enable `swade-core-rules` and any companion modules you use
-
----
-
-## Settings
-
-| Setting | Description |
+| | |
 |---|---|
-| Compendiums to Search | Which compendiums to search for item matching during import |
-| Default Token Settings | Prototype token defaults (disposition, display, vision) applied to all imports |
-| Default Actor Type | Whether new imports default to NPC or Character |
-| Default Wild Card | Whether Wild Card is pre-checked |
-| Auto-calculate Toughness | Recalculate Toughness from Vigor + armor |
-| Auto-set token size | Set token size based on creature Size special ability |
-| Actor Image Upload Path | Folder in Foundry's file system where dropped images are uploaded (browse with 📁) |
-| Additional stat labels | Extra labels to detect in stat blocks (comma-separated, must be followed by `:`) |
+| ⬇ **Import** | Paste a SWADE stat block (Pinnacle, Savaged.us plain/Markdown/JSON) → **Analyze** → **Import**. Creates actors with attributes, skills, edges, hindrances, powers, weapons, armor, gear, special abilities and more. Vehicles too. |
+| ⬆ **Export** | Turn any existing SWADE actor back into a Pinnacle-format stat block for sharing or AI editing. |
+| 🤖 **AI Creation** | Build a complete prompt from your rules + reference lists (**📋 Copy All for AI**), paste it into any AI, and import the result. |
+| 🎛️ **Library Sources** | Choose which sources feed each category — *Default*, *Compendium*, or *Named Lists* — and save them as reusable **usage profiles**. |
+| 📐 **Setting Rules** | Official SWADE setting rules (Born a Hero, No Power Points, …) plus creation parameters and freeform homebrew. Link a rule set to a usage profile for one-click campaign switching. |
+| 📤 **Export / Import config** | Back up or transfer the whole module configuration — settings, profiles, rule sets, library data. Per-category export/import supported. |
+| 📚 **Reference Library** | Built-in, editable lists based on the **SWADE Core Rulebook v5.7**. |
 
 ---
 
-## Supported Input Formats
+## 🚀 Install
 
-### Pinnacle (PEG) Standard
+**Module Manager (recommended)**
+
+Foundry → **Add-on Modules → Install Module** → paste:
+
+```
+https://raw.githubusercontent.com/jacksands/SWADE-Stat-Block-Importer/refs/heads/main/module.json
+```
+
+**Manual** — download the [latest release](https://github.com/jacksands/SWADE-Stat-Block-Importer/archive/refs/heads/main.zip), extract to `Data/modules/swade-stat-block-importer`, restart Foundry and enable it.
+
+> Requires **Foundry VTT v14** and the **SWADE system 6.0.0+**.
+
+---
+
+## 🕹️ Quick start
+
+1. **Import a stat block** — open the importer from the **Actors sidebar**, paste a stat block, click **🔍 Analyze**, then **⬇ Import**. Pick actor type (NPC / Character / Vehicle) and Wild Card as needed. *Selecting “Character” pre-checks Wild Card.*
+2. **Set up compendiums** — *Game Settings → SWADE Stat Block Importer → **Compendiums to Search***. Without this, items are created without descriptions or artwork.
+3. **Create with AI** — open **📖 Help**, pick your sources in **🎛️ Library Sources**, set your **📐 Setting Rules**, then hit **📋 Copy All for AI** and paste into your AI, ending with a Pinnacle-format stat block.
+
+---
+
+## 🧭 The Help window
+
+Everything lives in one place (**📖 Help**):
+
+| Tab | Purpose |
+|---|---|
+| 🎛️ **Library Sources** | Usage profiles: pick Default / Compendium / Named Lists per category, save & load profiles, link a Setting Rule Set. |
+| 🚀 **Quick Start** | Step-by-step guide and accepted formats. |
+| ⚙️ **Settings** | Explains every module setting. |
+| 📄 **Format** | Stat-block format reference with examples. |
+| 🤖 **AI Creation** | AI workflow, rank scale, quick math, example prompts. |
+| 📐 **Setting Rules** | Core / Setting-specific / Optional SWADE rules + creation parameters + homebrew. |
+| 📤 **Export / Import** | Backup and transfer of settings, profiles, rule sets and library data. |
+| 📘✦✦⚠🧝📦 **Skills / Edges / Powers / Abilities / Hindrances / Races / Items** | Editable reference lists with defaults from the core rulebook. |
+
+---
+
+## 📥 Supported input
+
+<details>
+<summary><b>Pinnacle (PEG) standard</b></summary>
+
 ```
 [WC] Character Name
 Optional biography.
@@ -121,61 +90,73 @@ Special Abilities:
 • Fearless: Immune to Fear and Intimidation.
 • Armor +2: Thick hide.
 ```
+</details>
 
-### Savaged.us JSON
-Paste the raw JSON export from the savaged.us character builder. Image URL is auto-detected.
+<details>
+<summary><b>Savaged.us</b> — plain text, Markdown, and JSON</summary>
 
-### Savaged.us Markdown
-Paste the Markdown export. Bold labels (`**Attributes**:`) and headers (`## Section`) are normalized automatically.
+Paste the export as-is; the importer normalizes headers and strips analyzer noise. The JSON export auto-fills the actor image.
+</details>
 
-### Savaged.us Plain Text
-Paste the full page export. The analyzer header and "Analysis" section are stripped automatically.
+<details>
+<summary><b>Vehicle stat block</b></summary>
 
-### Vehicle Format
 ```
 Compact Car
 Acc/Top Speed: 20/50; Handling: +1; Toughness: 10 (2); Crew: 1+3
 Driver Skill: Driving; Mods: 2; Cost: $15,000
 Notes: Standard four-door automobile.
 ```
+</details>
 
 ---
 
-## Reference Library
+## ⚙️ Settings
 
-The module includes built-in reference lists based on **SWADE Core Rulebook v5.7**:
-
-- **Skills** — all core and non-core skills with linked attributes
-- **Edges** — complete list (Background, Combat, Leadership, Power, Professional, Social, Weird, Legendary)
-- **Powers** — all core powers with Rank, PP cost, Range, and Duration
-- **Special Abilities** — common creature abilities with mechanical effects
-- **Hindrances** — complete Minor and Major list with mechanical effects
-- **Races** — core races: Android, Aquarian, Avion, Dwarf, Elf, Half-Elf, Half-Folk, Human, Rakashan, Saurian, and setting examples
-
-All lists are editable. Add named lists for your setting, load from compendiums, or import/export as JSON.
-
----
-
-## Compatibility
-
-| Requirement | Version |
+| Setting | Description |
 |---|---|
-| Foundry VTT | V14 (minimum 14) |
-| SWADE System | 6.0.0+ |
+| **Compendiums to Search** | Which compendiums are searched to match items (edges, skills, powers, gear). |
+| **Export / Import Settings** | Backup / restore module configuration (GM only). |
+| **Default Token Settings** | Prototype token defaults for every import. |
+| **Default Actor Type** | NPC or Character by default. |
+| **Default: Wild Card** | Whether Wild Card is pre-checked for NPCs. |
+| **NPC Wild Card Bennies** | Starting Bennies for NPC Wild Cards (player characters always start with 3). |
+| **Auto-calculate Toughness** | Recalculate from Vigor + armor. |
+| **Auto-set token size** | From the creature’s Size ability. |
+| **Auto-set Ignored / Extra Wounds** | For Undead/Construct/Elemental and Size/Resilient. |
+| **Special Ability bullet icon(s)** | Bullets the parser splits on (default `•|■`). |
+| **@ notation** | Force item types in Special Abilities (`@w`, `@a`, `@e`, `@h`, `@sa`). |
+| **Additional stat labels** | Extra labels to detect (e.g. `Sanity:, Strain:`). |
+| **Actor Image Upload Path** | Foundry folder for dropped images. |
 
 ---
 
-## Author
+## 🔁 Configuration backup
 
-**Jack_Sands (Erich)**
-Discord: `jack_sands`
+**Export / Import** (in Module Settings or the Help window) transfers everything **except actor data and images**, which the module creates but does not own:
 
-Repository: [github.com/jacksands/SWADE-Stat-Block-Importer](https://github.com/jacksands/SWADE-Stat-Block-Importer)
+- **Full Backup** · **Settings only** · **Usage Profiles only** · **Per category**
+- Import as **Merge**, **Replace**, or **Selective** (per category), optionally applied to a profile.
+- Files are **validated first**: you’ll be warned about missing modules/compendiums and informed about new libraries found locally.
 
 ---
 
-## License
+## 📚 Reference library
 
-This module is provided as-is for personal and community use with Foundry VTT and the Savage Worlds Adventure Edition system.
+Built-in, fully editable lists from **SWADE Core Rulebook v5.7**:
 
-*Savage Worlds and SWADE are products of Pinnacle Entertainment Group. This module is not affiliated with or endorsed by Pinnacle Entertainment Group.*
+**Skills** · **Edges** · **Powers** · **Special Abilities** · **Hindrances** · **Races**
+
+Add your own named lists, load from compendiums, or import/export as JSON.
+
+---
+
+<div align="center">
+
+**Author:** Jack_Sands (Erich) · Discord `jack_sands`
+[github.com/jacksands/SWADE-Stat-Block-Importer](https://github.com/jacksands/SWADE-Stat-Block-Importer)
+
+Savage Worlds and SWADE are products of Pinnacle Entertainment Group.
+This module is not affiliated with or endorsed by Pinnacle Entertainment Group.
+
+</div>

@@ -14,18 +14,88 @@ export const ITEM_SWADE_TYPE   = { weapon:'weapon', armor:'armor', shield:'shiel
 // Main ref categories (order determines tab display)
 export const MAIN_REF_CATS = ['skills', 'edges', 'powers', 'abilities', 'hindrances', 'races'];
 
+// Setting Rules Catalog — all official SWADE rules from Core Rulebook
+export const SETTING_RULE_CATALOG = [
+  // Core Setting Rules
+  { group: 'core', key: 'bornAHero',       type: 'boolean', label: 'Born a Hero',           help: 'Ignore Rank qualifications for Edges at creation (must still meet other requirements). Greatly expands options for combat/supernatural Edges.' },
+  { group: 'core', key: 'multipleLanguages', type: 'boolean', label: 'Multiple Languages',    help: 'All characters gain Linguist Edge free; know languages equal to half Smarts die type at d6. If Linguist Edge taken, languages = full Smarts die.' },
+  { group: 'core', key: 'noPowerPoints',   type: 'boolean', label: 'No Power Points',       help: 'Arcane Backgrounds do not use Power Points. Arcane skill rolls penalized by half power cost. Failure cancels powers and Shakes caster. Maintaining powers inflicts cumulative –1.' },
+  { group: 'core', key: 'pathfinderLanguages', type: 'boolean', label: 'Pathfinder Style Languages', help: 'Languages are binary known/unknown (not skills). Characters know languages based on Smarts (often half Smarts die + native). Frees skill points.' },
+  { group: 'core', key: 'skillSpecializations', type: 'boolean', label: 'Skill Specializations', help: 'Broad skills (Boating, Driving, Fighting, Piloting, Riding, Science, Shooting, Survival) require one specialization. Using outside specialization incurs –2 penalty. Additional specializations cost like raising a skill below linked attribute.' },
+  { group: 'core', key: 'unarmoredHero',   type: 'boolean', label: 'Unarmored Hero',        help: 'Wild Cards wearing no armor/shield add +2 to all Soak rolls. Encourages pulp/swashbuckling playstyle.' },
+
+  // Setting-Specific Rules
+  { group: 'setting', key: 'characterFrameworks', type: 'boolean', label: 'Character Frameworks', help: 'Characters must choose a Framework (Class/Archetype) at creation. Grants specific Edges, skills, abilities, or Hindrances. May impose requirements or restrictions.' },
+  { group: 'setting', key: 'factions',       type: 'boolean', label: 'Setting Uses Factions',    help: 'Characters may belong to a Faction. Membership grants benefits (free Edge, skill bonus, contacts, gear) but imposes obligations (Hindrances like Obligation, Enemy, Vow) or restrictions.' },
+
+  // Optional Rules
+  { group: 'optional', key: 'encumbrance',   type: 'boolean', label: 'Setting Counts Encumbrance', help: 'Track gear weight. Exceeding carrying capacity (based on Strength) causes Encumbered: –2 Pace, running, Agility/linked skills, Vigor vs Fatigue. At 3× lifted weight: Pace 1, Fatigue rolls required.' },
+  { group: 'optional', key: 'minimumStrength', type: 'boolean', label: 'Setting Counts Minimum Strength', help: 'Items with Minimum Strength impose penalties if below: Armor/worn –1 Pace per die type, –1 Agility/skills; Melee/thrown – damage die limited by Strength; Ranged –1 attack per die step difference.' },
+  { group: 'optional', key: 'wealthSystem',  type: 'boolean', label: 'Setting Counts Wealth',     help: 'Use Wealth die instead of tracking money. Default Wealth d6. Mundane purchases auto; expensive items require Wealth roll. Poverty d4, Rich d8, Filthy Rich d10. Starting funds replaced by Wealth system.' },
+
+  // Character Creation Parameters
+  { group: 'params', key: 'attrPoints',      type: 'number',  label: 'Starting Attribute Points', help: 'Points to raise attributes from d4. Each step costs 1 point. Default 5.', min: 1, max: 20 },
+  { group: 'params', key: 'skillPoints',     type: 'number',  label: 'Starting Skill Points',     help: 'Points for skills. Core skills start at d4 free. 1 point per die type up to linked attribute, then 2 points. Default 12.', min: 1, max: 50 },
+  { group: 'params', key: 'extraPerkPoints', type: 'number',  label: 'Extra Perk Points',         help: 'Additional points like Hindrance points to buy Edges (2 pts=1 Edge, 1 pt=1 skill point or double funds). No Hindrance required. Default 0.', min: 0, max: 20 },
+  { group: 'params', key: 'startingWealth',  type: 'number',  label: 'Starting Wealth ($)',       help: 'Default starting funds for gear. Default $500. Ignored if Wealth system used.', min: 0, max: 100000 },
+  { group: 'params', key: 'rankNames',       type: 'text',    label: 'Rank Names (comma-separated)', help: 'Optional cosmetic rename of Ranks (e.g., "Initiate, Adept, Master, Champion, Legend"). No mechanical effect.' },
+];
+
 // Default setting rules (always available, never stored, never deleted)
 export const DEFAULT_SETTING_RULES = {
   id: 'default',
   name: 'Default SWADE AE',
+  // Core rules
+  bornAHero: false,
+  multipleLanguages: false,
+  noPowerPoints: false,
+  pathfinderLanguages: false,
+  skillSpecializations: false,
+  unarmoredHero: false,
+  // Setting-specific
+  characterFrameworks: false,
+  factions: false,
+  // Optional rules
+  encumbrance: false,
+  minimumStrength: false,
+  wealthSystem: false,
+  // Parameters
   attrPoints: 5,
   skillPoints: 12,
+  extraPerkPoints: 0,
+  startingWealth: 500,
+  rankNames: '',
+  // Legacy fields (for backward compat)
   coreSkills: 'Athletics (Agility d4)\nCommon Knowledge (Smarts d4)\nNotice (Smarts d4)\nPersuasion (Spirit d4)\nStealth (Agility d4)',
   notes: '',
 };
 
 function blankMainPrefs() { return { useDefault: true, useCompendium: true, listIds: [] }; }
 function blankItemPrefs() { return { useCompendium: true, listIds: [] }; }
+
+function defaultProfile(id = null) {
+  return {
+    id: id ?? foundry.utils.randomID(),
+    name: 'Default',
+    description: 'Default library source selection',
+    prefs: {
+      edges:     blankMainPrefs(),
+      powers:    blankMainPrefs(),
+      abilities: blankMainPrefs(),
+      skills:    blankMainPrefs(),
+      hindrances:blankMainPrefs(),
+      races:     blankMainPrefs(),
+      items:     Object.fromEntries(ITEM_SUBTYPES.map(s => [s, blankItemPrefs()])),
+    },
+    compsToUse: [],
+    settingRuleSetId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// Stable id for the built-in profile so reads are deterministic before first write
+export const DEFAULT_PROFILE_ID = 'profile-default';
 
 export function defaultLibrary() {
   return {
@@ -35,6 +105,10 @@ export function defaultLibrary() {
       items: Object.fromEntries(ITEM_SUBTYPES.map(s => [s, ''])),
     },
     namedLists: [],   // [{id, name, category, subtype, content}]
+    profiles: {
+      active: null,
+      items: [defaultProfile(DEFAULT_PROFILE_ID)],
+    },
     prefs: {
       edges:     blankMainPrefs(),
       powers:    blankMainPrefs(),
@@ -46,21 +120,149 @@ export function defaultLibrary() {
     },
     settingRules: {
       active: 'default',
-      namedSets: [],  // [{id, name, attrPoints, skillPoints, coreSkills, notes}]
+      namedSets: [],  // [{id, name, attrPoints, skillPoints, coreSkills, notes, ...}]
     },
   };
 }
 
 export function getLibrary() {
   const raw = getSetting(S.sbiLibrary);
-  if (!raw || typeof raw !== 'object' || Object.keys(raw).length === 0) return defaultLibrary();
-  return foundry.utils.mergeObject(defaultLibrary(), raw, { inplace: false });
+  const isEmpty = !raw || typeof raw !== 'object' || Object.keys(raw).length === 0;
+  const lib = isEmpty
+    ? defaultLibrary()
+    : foundry.utils.mergeObject(defaultLibrary(), raw, { inplace: false });
+  // Backward compat: ensure profiles structure exists
+  if (!lib.profiles) lib.profiles = { active: null, items: [] };
+  if (!lib.profiles.items.length) lib.profiles.items.push(defaultProfile(DEFAULT_PROFILE_ID));
+  if (!lib.profiles.active) lib.profiles.active = lib.profiles.items[0].id;
+  // Ensure active profile's prefs are merged into legacy prefs for backward compat
+  const activeProfile = lib.profiles.items.find(p => p.id === lib.profiles.active);
+  if (activeProfile) {
+    lib.prefs = foundry.utils.mergeObject(lib.prefs, activeProfile.prefs, { inplace: false });
+  }
+  return lib;
 }
 
 export async function updateLibrary(updater) {
   const lib = getLibrary();
   updater(lib);
   return setSetting(S.sbiLibrary, lib);
+}
+
+// ── Profiles ─────────────────────────────────────────────────────────────
+export function getProfiles() {
+  const lib = getLibrary();
+  return lib.profiles;
+}
+
+export function getActiveProfile() {
+  const lib = getLibrary();
+  const activeId = lib.profiles.active;
+  return lib.profiles.items.find(p => p.id === activeId) ?? lib.profiles.items[0];
+}
+
+export async function setActiveProfile(id) {
+  await updateLibrary(lib => {
+    if (!lib.profiles) lib.profiles = { active: null, items: [] };
+    lib.profiles.active = id;
+    // Update legacy prefs for backward compat
+    const profile = lib.profiles.items.find(p => p.id === id);
+    if (profile) lib.prefs = { ...lib.prefs, ...profile.prefs };
+  });
+}
+
+export async function createProfile(name, description = '') {
+  const profile = defaultProfile();
+  profile.name = name;
+  profile.description = description;
+  await updateLibrary(lib => {
+    if (!lib.profiles) lib.profiles = { active: null, items: [] };
+    lib.profiles.items.push(profile);
+    lib.profiles.active = profile.id;
+  });
+  return profile.id;
+}
+
+export async function saveProfile(id, data) {
+  await updateLibrary(lib => {
+    const p = lib.profiles.items.find(x => x.id === id);
+    if (!p) return;
+    if (data.name !== undefined) p.name = data.name;
+    if (data.description !== undefined) p.description = data.description;
+    if (data.prefs !== undefined) p.prefs = data.prefs;
+    if (data.compsToUse !== undefined) p.compsToUse = data.compsToUse;
+    if (data.settingRuleSetId !== undefined) p.settingRuleSetId = data.settingRuleSetId;
+    p.updatedAt = new Date().toISOString();
+    // Update legacy prefs if this is the active profile
+    if (lib.profiles.active === id) lib.prefs = { ...lib.prefs, ...p.prefs };
+  });
+}
+
+export async function renameProfile(id, newName) {
+  await updateLibrary(lib => {
+    const p = lib.profiles.items.find(x => x.id === id);
+    if (p) p.name = newName;
+  });
+}
+
+export async function deleteProfile(id) {
+  await updateLibrary(lib => {
+    if (!lib.profiles) return;
+    lib.profiles.items = lib.profiles.items.filter(x => x.id !== id);
+    if (lib.profiles.active === id) {
+      lib.profiles.active = lib.profiles.items[0]?.id ?? null;
+      if (lib.profiles.active) {
+        const p = lib.profiles.items.find(x => x.id === lib.profiles.active);
+        if (p) lib.prefs = { ...lib.prefs, ...p.prefs };
+      }
+    }
+  });
+}
+
+export function normalizePrefs(prefs) {
+  const result = {};
+  for (const cat of MAIN_REF_CATS) {
+    result[cat] = prefs[cat] ? { ...blankMainPrefs(), ...prefs[cat] } : blankMainPrefs();
+  }
+  result.items = {};
+  for (const sub of ITEM_SUBTYPES) {
+    result.items[sub] = prefs.items?.[sub] ? { ...blankItemPrefs(), ...prefs.items[sub] } : blankItemPrefs();
+  }
+  return result;
+}
+
+// Apply a profile's prefs + compsToUse + setting rule set
+export async function applyProfile(id) {
+  const lib = getLibrary();
+  const profile = lib.profiles.items.find(p => p.id === id);
+  if (!profile) return;
+
+  await applyProfilePrefs(id);
+
+  if (profile.settingRuleSetId) {
+    await setActiveSettingRuleSet(profile.settingRuleSetId);
+  }
+
+  return profile;
+}
+
+// Apply only a profile's prefs + compendium selection (no setting rule set switch)
+export async function applyProfilePrefs(id) {
+  const lib = getLibrary();
+  const profile = lib.profiles.items.find(p => p.id === id);
+  if (!profile) return;
+
+  await updateLibrary(lib => {
+    lib.prefs = normalizePrefs(profile.prefs);
+    lib.profiles.active = id;
+  });
+
+  if (profile.compsToUse?.length) {
+    await setSetting(S.compsToUse, profile.compsToUse);
+    await setSetting(S.packageToUse, []);
+  }
+
+  return profile;
 }
 
 // ── Default content ──────────────────────────────────────────────────
@@ -181,7 +383,10 @@ export function getSettingRules() {
 export function getActiveSettingRuleSet() {
   const sr = getSettingRules();
   if (!sr.active || sr.active === 'default') return DEFAULT_SETTING_RULES;
-  return (sr.namedSets ?? []).find(s => s.id === sr.active) ?? DEFAULT_SETTING_RULES;
+  const found = (sr.namedSets ?? []).find(s => s.id === sr.active);
+  if (!found) return DEFAULT_SETTING_RULES;
+  // Merge with defaults for backward compatibility (older sets may lack new keys)
+  return { ...DEFAULT_SETTING_RULES, ...found };
 }
 
 export async function setActiveSettingRuleSet(id) {
@@ -195,13 +400,12 @@ export async function createSettingRuleSet(name) {
   const id = foundry.utils.randomID();
   await updateLibrary(lib => {
     if (!lib.settingRules) lib.settingRules = { active: 'default', namedSets: [] };
-    lib.settingRules.namedSets.push({
-      id, name,
-      attrPoints: DEFAULT_SETTING_RULES.attrPoints,
-      skillPoints: DEFAULT_SETTING_RULES.skillPoints,
-      coreSkills:  DEFAULT_SETTING_RULES.coreSkills,
-      notes: '',
-    });
+    // Build a new rule set with ALL keys from DEFAULT_SETTING_RULES
+    const newSet = { id, name };
+    for (const key of Object.keys(DEFAULT_SETTING_RULES)) {
+      if (key !== 'id' && key !== 'name') newSet[key] = DEFAULT_SETTING_RULES[key];
+    }
+    lib.settingRules.namedSets.push(newSet);
     lib.settingRules.active = id;
   });
   return id;

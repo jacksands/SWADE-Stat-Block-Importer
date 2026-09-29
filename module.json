@@ -2,7 +2,7 @@
   "id": "swade-stat-block-importer",
   "title": "SWADE Stat Block Importer",
   "description": "Import/export Pinnacle SWADE stat blocks. Includes a multi-source named-list library for AI-assisted character creation.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "authors": [{ "name": "Jack_Sands (Erich)", "discord": "jack_sands" }],
   "compatibility": { "minimum": 14, "verified": 14 },
   "esmodules": ["main.mjs"],

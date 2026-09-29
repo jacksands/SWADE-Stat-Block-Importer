@@ -22,9 +22,12 @@ class SwadeImporterApp extends foundry.applications.api.ApplicationV2 {
 
   async _prepareContext(options) {
     const tokenDefs = getSetting(S.tokenSettings) ?? {};
+    const actorType = getSetting(S.defaultActorType) ?? 'npc';
+    // Default Wild Card to true for Character, false for NPC/Vehicle
+    const isWildcard = actorType === 'character' ? true : (getSetting(S.defaultIsWildcard) ?? false);
     return {
-      actorType:   getSetting(S.defaultActorType)  ?? 'npc',
-      isWildcard:  getSetting(S.defaultIsWildcard) ?? false,
+      actorType,
+      isWildcard,
       disposition: tokenDefs.disposition ?? -1,
       vision:      tokenDefs.vision ?? false,
       visionRange: tokenDefs.visionRange ?? 0,
@@ -92,16 +95,24 @@ class SwadeImporterApp extends foundry.applications.api.ApplicationV2 {
       const out = this.element.querySelector('#sbi-analysis-output');
       if (out) out.innerHTML = '';
     });
-    // Wire actor type radios — Vehicle disables Wild Card
+    // Wire actor type radios — update Wild Card based on type
     this.element.querySelectorAll('input[name="sbi-actorType"]').forEach(radio => {
-      radio.addEventListener('change', () => this._updateVehicleUI(radio.value === 'vehicle'));
+      radio.addEventListener('change', () => this._updateActorTypeUI(radio.value));
     });
   }
 
-  _updateVehicleUI(isVehicle) {
+  _updateActorTypeUI(actorType) {
     const wcBox  = this.element.querySelector('#sbi-isWildCard');
     const wcNote = this.element.querySelector('#sbi-wc-note');
-    if (wcBox)  { wcBox.disabled = isVehicle; if (isVehicle) wcBox.checked = false; }
+    const isVehicle   = actorType === 'vehicle';
+    const isCharacter = actorType === 'character';
+
+    if (wcBox) {
+      wcBox.disabled = isVehicle;
+      if (isVehicle)        wcBox.checked = false;
+      else if (isCharacter) wcBox.checked = true;                                  // PCs are always Wild Cards
+      else                  wcBox.checked = getSetting(S.defaultIsWildcard) ?? false; // NPC → configured default
+    }
     if (wcNote) wcNote.style.opacity = isVehicle ? '1' : '0';
   }
 
@@ -114,7 +125,7 @@ class SwadeImporterApp extends foundry.applications.api.ApplicationV2 {
     if (isVehicleStatBlock(raw)) {
       // Auto-select Vehicle radio
       const vRadio = this.element.querySelector('input[name="sbi-actorType"][value="vehicle"]');
-      if (vRadio) { vRadio.checked = true; this._updateVehicleUI(true); }
+      if (vRadio) { vRadio.checked = true; this._updateActorTypeUI('vehicle'); }
       const result = await analyzeVehicleStatBlock(raw);
       this._analysisOK = result.valid;
       if (out) out.innerHTML = renderVehicleAnalysis(result);

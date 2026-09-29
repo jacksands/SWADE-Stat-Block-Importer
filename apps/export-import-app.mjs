@@ -1,7 +1,25 @@
-// apps/export-import-app.mjs — Export and Import dialogs
-import { MODULE_ID, SBI_HELP_CSS, injectCSS, uiInfo, uiError } from '../utils.mjs';
-import { ITEM_SUBTYPES, ITEM_SUBTYPE_LABEL, getLibrary, getNamedListsFor } from '../library/store.mjs';
+// apps/export-import-app.mjs — Export/Import dialogs (settings, profiles, lists)
+import { MODULE_ID, S, SBI_HELP_CSS, injectCSS, uiInfo, uiError, getSetting } from '../utils.mjs';
+import {
+  ITEM_SUBTYPES, ITEM_SUBTYPE_LABEL, MAIN_REF_CATS,
+  getLibrary, getNamedListsFor, getProfiles, applyProfile,
+} from '../library/store.mjs';
 import { exportLibraryJSON, importLibraryJSON, downloadJSON } from '../library/io.mjs';
+import { validateImportData } from '../library/validation.mjs';
+import { SelectCompendiums } from './settings-apps.mjs';
+
+const CAT_LABEL = {
+  skills:'Skills', edges:'Edges', powers:'Powers',
+  abilities:'Abilities', hindrances:'Hindrances', races:'Races',
+};
+
+function catCheckboxRows() {
+  const main = MAIN_REF_CATS.map(cat =>
+    `<label class="ei-cat"><input type="checkbox" class="ei-cat-cb" data-cat="${cat}" checked> ${CAT_LABEL[cat] ?? cat}</label>`).join('');
+  const items = ITEM_SUBTYPES.map(sub =>
+    `<label class="ei-cat"><input type="checkbox" class="ei-cat-cb" data-cat="${sub}" data-sub="${sub}" checked> Items › ${ITEM_SUBTYPE_LABEL[sub]}</label>`).join('');
+  return `<div class="ei-cat-grid">${main}${items}</div>`;
+}
 
 // ─── EXPORT APP ────────────────────────────────────────────────────────
 export class SbiExportApp extends foundry.applications.api.ApplicationV2 {
@@ -12,49 +30,42 @@ export class SbiExportApp extends foundry.applications.api.ApplicationV2 {
 
   static DEFAULT_OPTIONS = {
     id: 'sbi-export',
-    window: { title: 'SBI — Export Library', resizable: false },
-    position: { width: 420, height: 'auto' },
+    window: { title: 'SBI — Export', resizable: true },
+    position: { width: 520, height: 'auto' },
   };
 
   _buildHTML() {
-    const lib  = getLibrary();
-    const cats = ['edges','powers','abilities'];
-    const catRows = cats.map(cat => {
-      const lists = getNamedListsFor(cat);
-      const listRows = lists.map(l =>
-        `<label class="lu-list-opt" style="margin-left:20px;display:block;font-size:11px;">
-          <input type="checkbox" class="exp-list-cb" data-cat="${cat}" data-id="${l.id}" checked> ${l.name}</label>`
-      ).join('');
-      return `<label><input type="checkbox" class="exp-cat-cb" data-cat="${cat}" checked>
-        <strong>${cat.charAt(0).toUpperCase() + cat.slice(1)}</strong></label>${listRows}`;
-    });
+    const lib = getLibrary();
+    const listRows = lib.namedLists.map(l =>
+      `<label class="ei-list" style="margin-left:18px;display:block;font-size:11px;">
+        <input type="checkbox" class="ei-list-cb" data-cat="${l.category}" data-sub="${l.subtype ?? ''}" data-id="${l.id}" checked>
+        ${l.name} <span style="opacity:.5">(${l.category}${l.subtype ? ' › ' + l.subtype : ''})</span></label>`).join('') ||
+      '<span style="opacity:.5;font-size:11px;">No named lists saved.</span>';
 
-    const itemRows = ITEM_SUBTYPES.map(sub => {
-      const lists = getNamedListsFor('items', sub);
-      const listRows = lists.map(l =>
-        `<label style="margin-left:20px;display:block;font-size:11px;">
-          <input type="checkbox" class="exp-list-cb" data-cat="items" data-sub="${sub}" data-id="${l.id}" checked> ${l.name}</label>`
-      ).join('');
-      return `<label><input type="checkbox" class="exp-cat-cb" data-cat="items" data-sub="${sub}" checked>
-        Items › ${ITEM_SUBTYPE_LABEL[sub]}</label>${listRows}`;
-    }).join('');
+    return `<div id="sbi-exp-root">
+      <p class="ei-intro">Choose what to include in the exported JSON file. Actor data and images are never exported.</p>
 
-    return `<div id="sbi-exp-root" style="padding:12px;">
-      <p style="font-size:12px;opacity:.7;margin:0 0 10px;">Choose what to include in the exported JSON file.</p>
-      <div style="margin-bottom:10px;border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;">
-        <div style="font-weight:600;margin-bottom:6px;font-size:12px;">Content</div>
-        <label><input type="checkbox" id="exp-inc-settings"> Game Settings (compendium selections, defaults)</label><br>
-        <label><input type="checkbox" id="exp-inc-comp" checked> Compendium-loaded data</label><br>
-        <label><input type="checkbox" id="exp-inc-lists" checked> Named Lists</label>
+      <div class="ei-box">
+        <div class="ei-box-title">Export preset</div>
+        <label><input type="radio" name="exp-preset" value="full" checked> <strong>Full Backup</strong> — settings, usage profiles, setting rules, compendium data and named lists</label>
+        <label><input type="radio" name="exp-preset" value="settings"> <strong>Settings only</strong> — module settings + setting rules</label>
+        <label><input type="radio" name="exp-preset" value="profiles"> <strong>Usage Profiles only</strong> — profiles + library source selections</label>
+        <label><input type="radio" name="exp-preset" value="category"> <strong>Per category</strong> — pick categories below</label>
       </div>
-      <div id="exp-cat-section" style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;font-size:12px;display:flex;flex-direction:column;gap:4px;">
-        <div style="font-weight:600;margin-bottom:4px;font-size:12px;">Categories to export</div>
-        ${catRows.join('')}
-        ${itemRows}
+
+      <div class="ei-box" id="exp-cat-box" style="display:none;">
+        <div class="ei-box-title">Categories to export</div>
+        ${catCheckboxRows()}
       </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
-        <button id="exp-download-btn" style="padding:4px 16px;">⬇ Download JSON</button>
-        <button id="exp-close-btn" style="padding:4px 12px;opacity:.6;">Cancel</button>
+
+      <div class="ei-box">
+        <div class="ei-box-title">Named lists <button type="button" class="ei-mini" id="exp-lists-all">All</button> <button type="button" class="ei-mini" id="exp-lists-none">None</button></div>
+        <div class="ei-list-scroll">${listRows}</div>
+      </div>
+
+      <div class="ei-footer">
+        <button id="exp-close-btn" class="ei-secondary">Cancel</button>
+        <button id="exp-download-btn">⬇ Download JSON</button>
       </div>
     </div>`;
   }
@@ -72,27 +83,38 @@ export class SbiExportApp extends foundry.applications.api.ApplicationV2 {
   }
 
   _onRender() {
+    this.element.querySelectorAll('input[name="exp-preset"]').forEach(r =>
+      r.addEventListener('change', () => {
+        const isCat = this.element.querySelector('input[name="exp-preset"]:checked')?.value === 'category';
+        const box = this.element.querySelector('#exp-cat-box');
+        if (box) box.style.display = isCat ? '' : 'none';
+      }));
+    this.element.querySelector('#exp-lists-all')?.addEventListener('click', () =>
+      this.element.querySelectorAll('.ei-list-cb').forEach(c => c.checked = true));
+    this.element.querySelector('#exp-lists-none')?.addEventListener('click', () =>
+      this.element.querySelectorAll('.ei-list-cb').forEach(c => c.checked = false));
     this.element.querySelector('#exp-download-btn')?.addEventListener('click', () => this._download());
     this.element.querySelector('#exp-close-btn')?.addEventListener('click', () => this.close());
   }
 
   _download() {
-    const get = id => this.element.querySelector(`#${id}`)?.checked ?? false;
-    const catCbs = [...this.element.querySelectorAll('.exp-cat-cb')];
-    const categories = catCbs.filter(cb => cb.checked).map(cb => cb.dataset.cat === 'items' ? 'items' : cb.dataset.cat);
-    const uniq = [...new Set(categories)];
-    const listCbs = [...this.element.querySelectorAll('.exp-list-cb')];
-    const listIds = listCbs.filter(cb => cb.checked).map(cb => cb.dataset.id);
+    const preset = this.element.querySelector('input[name="exp-preset"]:checked')?.value ?? 'full';
+    const categories = [...this.element.querySelectorAll('.ei-cat-cb:checked')]
+      .map(cb => cb.dataset.sub || cb.dataset.cat);
+    const listIds = [...this.element.querySelectorAll('.ei-list-cb:checked')].map(cb => cb.dataset.id);
+
     const json = exportLibraryJSON({
-      includeSettings:   get('exp-inc-settings'),
-      includeCompendium: get('exp-inc-comp'),
-      includeNamedLists: get('exp-inc-lists'),
-      categories: uniq.length ? uniq : null,
-      listIds:    listIds.length ? listIds : null,
+      exportType: preset === 'category' ? 'category' : preset,
+      includeSettings:   preset === 'settings',
+      includeProfiles:   preset === 'profiles',
+      includeCompendium: preset === 'full',
+      includeNamedLists: true,
+      categories: preset === 'category' && categories.length ? categories : null,
+      listIds: (preset === 'full' || preset === 'category') && listIds.length ? listIds : null,
     });
-    const date = new Date().toISOString().slice(0,10);
-    downloadJSON(`sbi-library-${date}.json`, json);
-    uiInfo('Library exported.');
+    const date = new Date().toISOString().slice(0, 10);
+    downloadJSON(`sbi-export-${preset}-${date}.json`, json);
+    uiInfo('Export downloaded.');
     this.close();
   }
 }
@@ -101,29 +123,50 @@ export class SbiExportApp extends foundry.applications.api.ApplicationV2 {
 export class SbiImportApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
     id: 'sbi-import',
-    window: { title: 'SBI — Import Library', resizable: false },
-    position: { width: 420, height: 'auto' },
+    window: { title: 'SBI — Import', resizable: true },
+    position: { width: 560, height: 'auto' },
   };
 
+  _parsed = null;
+  _fileContent = null;
+  _validation = null;
+
   _buildHTML() {
-    return `<div id="sbi-imp-root" style="padding:12px;">
-      <p style="font-size:12px;opacity:.7;margin:0 0 10px;">
-        Select a previously exported <code>.json</code> SBI library file.
-      </p>
-      <div style="margin-bottom:10px;">
+    const profiles = getProfiles();
+    const profileOpts = profiles.items
+      .map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+    return `<div id="sbi-imp-root">
+      <p class="ei-intro">Select a previously exported <code>.json</code> file. Import is validated before anything is applied.</p>
+
+      <div class="ei-box">
         <input type="file" id="imp-file-input" accept=".json" style="width:100%">
       </div>
-      <div id="imp-preview" style="font-size:11px;font-family:monospace;white-space:pre-wrap;padding:6px;background:rgba(0,0,0,.3);border-radius:3px;min-height:40px;max-height:160px;overflow-y:auto;margin-bottom:10px;opacity:.7;">
-        No file selected.
+
+      <div id="imp-validation" class="ei-validation" style="display:none;"></div>
+
+      <div class="ei-box">
+        <div class="ei-box-title">Import mode</div>
+        <label><input type="radio" name="imp-mode" value="merge" checked> <strong>Merge</strong> — add/update by id; keep existing data</label>
+        <label><input type="radio" name="imp-mode" value="replace"> <strong>Replace</strong> — overwrite matching categories</label>
+        <label><input type="radio" name="imp-mode" value="selective"> <strong>Selective</strong> — only the categories below</label>
+        <div id="imp-cat-box" style="display:none;margin-top:6px;">
+          ${catCheckboxRows()}
+        </div>
       </div>
-      <div style="border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:8px;margin-bottom:10px;font-size:12px;">
-        <div style="font-weight:600;margin-bottom:6px;">Import Mode</div>
-        <label><input type="radio" name="imp-mode" value="merge" checked> <strong>Merge</strong> — add lists, append compendium data. Existing data kept.</label><br>
-        <label><input type="radio" name="imp-mode" value="replace"> <strong>Replace</strong> — overwrite named lists for imported categories. Settings replaced if included.</label>
+
+      <div class="ei-box" id="imp-profile-box" style="display:none;">
+        <div class="ei-box-title">Library source selections (optional)</div>
+        <label><input type="checkbox" id="imp-apply-current"> Apply imported library sources to the <strong>active</strong> profile</label><br>
+        <label><input type="checkbox" id="imp-create-profile"> Create a new profile from the imported library sources</label>
+        <div style="margin-top:6px;">
+          <label>Or overwrite profile: <select id="imp-target-profile"><option value="">— none —</option>${profileOpts}</select></label>
+        </div>
       </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;">
-        <button id="imp-import-btn" style="padding:4px 16px;" disabled>⬆ Import</button>
-        <button id="imp-close-btn" style="padding:4px 12px;opacity:.6;">Cancel</button>
+
+      <div class="ei-footer">
+        <button id="imp-close-btn" class="ei-secondary">Cancel</button>
+        <button id="imp-import-btn" disabled>⬆ Import</button>
       </div>
     </div>`;
   }
@@ -137,57 +180,135 @@ export class SbiImportApp extends foundry.applications.api.ApplicationV2 {
 
   _replaceHTML(result, content, options) {
     this.element.querySelector('.window-content').replaceChildren(result);
-    this._onRender();
+    this._parsed = null;
     this._fileContent = null;
+    this._validation = null;
+    this._onRender();
   }
 
   _onRender() {
     this.element.querySelector('#imp-file-input')?.addEventListener('change', e => this._onFile(e));
     this.element.querySelector('#imp-import-btn')?.addEventListener('click', () => this._import());
     this.element.querySelector('#imp-close-btn')?.addEventListener('click', () => this.close());
+    this.element.querySelectorAll('input[name="imp-mode"]').forEach(r =>
+      r.addEventListener('change', () => {
+        const selective = this.element.querySelector('input[name="imp-mode"]:checked')?.value === 'selective';
+        const box = this.element.querySelector('#imp-cat-box');
+        if (box) box.style.display = selective ? '' : 'none';
+      }));
   }
 
-  _onFile(e) {
+  async _onFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      this._fileContent = ev.target.result;
-      const prev = this.element.querySelector('#imp-preview');
-      try {
-        const parsed = JSON.parse(this._fileContent);
-        const summary = [
-          `Type: ${parsed.type ?? '?'} v${parsed.version ?? '?'}`,
-          `Date: ${parsed.exportDate ?? '?'}`,
-          parsed.data?.namedLists ? `Named Lists: ${parsed.data.namedLists.length}` : '',
-          parsed.data?.settings   ? 'Settings: included' : '',
-          parsed.data?.compendium ? 'Compendium: included' : '',
-        ].filter(Boolean).join('\n');
-        if (prev) prev.textContent = summary;
-        this.element.querySelector('#imp-import-btn').disabled = false;
-      } catch {
-        if (prev) prev.textContent = 'Invalid JSON file.';
-        this.element.querySelector('#imp-import-btn').disabled = true;
+    this._fileContent = await file.text();
+    const validator = this.element.querySelector('#imp-validation');
+    try {
+      this._parsed = JSON.parse(this._fileContent);
+      // Validate (async)
+      this._validation = await validateImportData(this._parsed.data);
+      if (validator) {
+        validator.style.display = '';
+        validator.innerHTML = this._renderValidation(this._validation, this._parsed);
       }
-    };
-    reader.readAsText(file);
+      // Show profile options only when the file carries library sources
+      const hasPrefs = !!this._parsed.data?.prefs || !!this._parsed.data?.profiles;
+      const pbox = this.element.querySelector('#imp-profile-box');
+      if (pbox) pbox.style.display = hasPrefs ? '' : 'none';
+      this.element.querySelector('#imp-import-btn').disabled = !this._validation.valid;
+    } catch (err) {
+      this._parsed = null;
+      this._validation = { valid: false, errors: [err.message], warnings: [], info: [] };
+      if (validator) { validator.style.display = ''; validator.innerHTML = this._renderValidation(this._validation, null); }
+      this.element.querySelector('#imp-import-btn').disabled = true;
+    }
+  }
+
+  _renderValidation(v, parsed) {
+    const meta = parsed ? `<div class="ei-meta">Type: ${parsed.type ?? '?'} · v${parsed.version ?? '?'} · kind: ${parsed.kind ?? 'legacy'} · ${parsed.exportDate ?? ''}</div>` : '';
+    const section = (title, arr, cls) => arr?.length
+      ? `<div class="ei-val-${cls}"><strong>${title}</strong><ul>${arr.map(x => `<li>${x}</li>`).join('')}</ul></div>` : '';
+    const ok = v.valid && !v.warnings?.length && !v.info?.length
+      ? '<div class="ei-val-ok">✅ No issues detected — ready to import.</div>' : '';
+    return `${meta}${section('Errors', v.errors, 'err')}${section('Warnings', v.warnings, 'warn')}${section('Info', v.info, 'info')}${ok}`;
   }
 
   async _import() {
-    if (!this._fileContent) return;
+    if (!this._fileContent || !this._parsed) return;
     const mode = this.element.querySelector('input[name="imp-mode"]:checked')?.value ?? 'merge';
-    const btn  = this.element.querySelector('#imp-import-btn');
+    const categories = [...this.element.querySelectorAll('#imp-cat-box .ei-cat-cb:checked')]
+      .map(cb => cb.dataset.sub || cb.dataset.cat);
+
+    const applyToCurrentProfile = !!this.element.querySelector('#imp-apply-current')?.checked;
+    const createProfile = !!this.element.querySelector('#imp-create-profile')?.checked;
+    const targetProfileId = this.element.querySelector('#imp-target-profile')?.value || null;
+
+    const btn = this.element.querySelector('#imp-import-btn');
     btn.disabled = true;
     btn.textContent = '⏳ Importing...';
     try {
-      await importLibraryJSON(this._fileContent, mode);
-      uiInfo('Library imported successfully.');
+      const result = await importLibraryJSON(this._fileContent, {
+        mode,
+        targetCategories: mode === 'selective' && categories.length ? categories : null,
+        applyToCurrentProfile,
+        targetProfileId,
+        createProfile,
+      });
+      const parts = ['Import complete.'];
+      if (result?.availability?.warnings?.length) parts.push('', ...result.availability.warnings);
+      if (result?.availability?.info?.length)     parts.push('', ...result.availability.info);
+      uiInfo(parts.join('\n'));
       this.close();
-    } catch(e) {
+    } catch (e) {
       uiError(`Import failed: ${e.message}`);
       btn.disabled = false;
       btn.textContent = '⬆ Import';
     }
+  }
+}
+
+// ─── MENU APP (registered as a module settings menu) ─────────────────────
+export class ExportImportMenuApp extends foundry.applications.api.ApplicationV2 {
+  static DEFAULT_OPTIONS = {
+    id: 'sbi-export-import-menu',
+    window: { title: 'SBI — Export / Import Settings', resizable: false },
+    position: { width: 460, height: 'auto' },
+  };
+
+  _buildHTML() { return `
+    <div id="sbi-eim-root" style="padding:12px;">
+      <p style="font-size:12px;opacity:.75;margin:0 0 10px;">
+        Back up or transfer the module configuration — settings, usage profiles, setting rules,
+        compendium data and named lists. Actor data and images are not included.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+        <button type="button" id="eim-export" style="padding:6px 12px;">⬇ Export…</button>
+        <button type="button" id="eim-import" style="padding:6px 12px;">⬆ Import…</button>
+        <button type="button" id="eim-comps"  style="padding:6px 12px;">⚙ Compendiums to Search</button>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button type="button" id="eim-close" style="padding:4px 12px;opacity:.6;">Close</button>
+      </div>
+    </div>`;
+  }
+
+  async _renderHTML() {
+    injectCSS('sbi-help-css', SBI_HELP_CSS);
+    const div = document.createElement('div');
+    div.innerHTML = this._buildHTML();
+    return div;
+  }
+
+  _replaceHTML(result, content) {
+    this.element.querySelector('.window-content').replaceChildren(result);
+    this._onRender();
+  }
+
+  _onRender() {
+    this.element.querySelector('#eim-export')?.addEventListener('click', () => openExport());
+    this.element.querySelector('#eim-import')?.addEventListener('click', () => openImport());
+    this.element.querySelector('#eim-comps')?.addEventListener('click',  () => new SelectCompendiums().render({ force: true }));
+    this.element.querySelector('#eim-close')?.addEventListener('click',  () => this.close());
   }
 }
 

@@ -4,6 +4,7 @@ import { setAllPacks, getAllActiveCompendiums } from './lib/compendium-ops.mjs';
 import { SelectCompendiums, TokenSettingsApp, ImageUploadSettingsApp } from './apps/settings-apps.mjs';
 import { SwadeImporterApp, openImporterDialog } from './apps/importer-app.mjs';
 import { InstructionsApp, openInstructions } from './apps/instructions-app.mjs';
+import { ExportImportMenuApp } from './apps/export-import-app.mjs';
 import { migrateOldSettings } from './library/store.mjs';
 
 // ── Settings registration ─────────────────────────────────────────────
@@ -22,6 +23,11 @@ async function registerSettings() {
     name: 'Default Token Settings', label: 'Default Token Settings',
     hint: loc('sbi.settings.TokenSettingsHint'),
     icon: 'fas fa-eye', type: TokenSettingsApp, restricted: false,
+  });
+  game.settings.registerMenu(MODULE_ID, 'exportImportMenu', {
+    name: 'Export / Import Settings', label: '📤 Export / Import Settings',
+    hint: 'Back up or transfer module settings, usage profiles, setting rules, compendium data and named lists.',
+    icon: 'fas fa-file-export', type: ExportImportMenuApp, restricted: true,
   });
 
   const defs = [

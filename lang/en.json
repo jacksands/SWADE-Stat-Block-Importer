@@ -89,7 +89,7 @@
   "sbi.settings.DefaultIsWildcard": "Default: Wild Card",
   "sbi.settings.DefaultDisposition": "Default Disposition",
   "sbi.settings.NumberOfBennies": "NPC Wild Card Bennies",
-  "sbi.settings.NumberOfBenniesHint": "How many Bennies each NPC Wild Card starts with.",
+  "sbi.settings.NumberOfBenniesHint": "How many Bennies each NPC Wild Card starts with. Player Character Wild Cards always start with 3 (per SWADE rules).",
   "sbi.settings.BulletPointIcons": "Special Ability bullet icon(s)",
   "sbi.settings.BulletPointIconsHint": "Character(s) used as bullet points for Special Abilities, separated by pipe '|'. Default is the bullet point character.",
   "sbi.settings.ModifiedSpecialAbilities": "Use @ notation for Special Abilities",

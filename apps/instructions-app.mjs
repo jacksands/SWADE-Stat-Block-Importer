@@ -1,5 +1,5 @@
 // apps/instructions-app.mjs — InstructionsApp with named list library system
-import { uiInfo, uiError, loc, injectCSS, SBI_HELP_CSS, escHtml } from '../utils.mjs';
+import { uiInfo, uiError, loc, injectCSS, SBI_HELP_CSS, escHtml, getSetting, setSetting, S } from '../utils.mjs';
 import {
   ITEM_SUBTYPES, ITEM_SUBTYPE_LABEL, MAIN_REF_CATS,
   getDefaultContent, getCompendiumContent, getNamedListsFor, getNamedListById,
@@ -9,17 +9,20 @@ import {
   getSettingRules, getActiveSettingRuleSet,
   setActiveSettingRuleSet, createSettingRuleSet, saveSettingRuleSet,
   renameSettingRuleSet, deleteSettingRuleSet,
+  SETTING_RULE_CATALOG,
+  getProfiles, getActiveProfile, setActiveProfile, createProfile, saveProfile,
+  renameProfile, deleteProfile, normalizePrefs, applyProfile, applyProfilePrefs,
 } from '../library/store.mjs';
-import { openLibraryUse } from './library-use-app.mjs';
+import { SelectCompendiums } from './settings-apps.mjs';
 import { EntryEditorApp } from './entry-editor-app.mjs';
 import { openExport, openImport } from './export-import-app.mjs';
 
 // Skills is always included in master copy — cannot be ignored
 const ALWAYS_INCLUDED = new Set(['skills']);
 
-const CAT_LABELS = {
-  skills: '📘 Skills', edges: '✦ Edges', powers: '✦ Powers',
-  abilities: '✦ Abilities', hindrances: '⚠ Hindrances', races: '🧝 Races',
+const CAT_LABEL_PLAIN = {
+  skills:'Skills', edges:'Edges', powers:'Powers',
+  abilities:'Abilities', hindrances:'Hindrances', races:'Races',
 };
 const ITEM_ICONS = { weapon:'⚔', armor:'🛡', shield:'🔰', gear:'🎒', hindrance:'⚠', vehmod:'🔧' };
 
@@ -105,9 +108,11 @@ export class InstructionsApp extends foundry.applications.api.ApplicationV2 {
   // ── HTML builders ──────────────────────────────────────────────────
   _buildTabs() {
     const tabs = [
+      ['profiles','🎛️ Library Sources'],
       ['quick-start','🚀 Quick Start'], ['settings','⚙ Settings'],
       ['format','📄 Format'], ['ai','🤖 AI Creation'],
       ['setting-rules','📐 Setting Rules'],
+      ['export-import','📤 Export/Import'],
       ['skills','📘 Skills'], ['edges','✦ Edges'], ['powers','✦ Powers'],
       ['abilities','✦ Abilities'], ['hindrances','⚠ Hindrances'],
       ['races','🧝 Races'], ['items','📦 Items'],
@@ -130,7 +135,6 @@ export class InstructionsApp extends foundry.applications.api.ApplicationV2 {
   <button class="src-action" data-action="copy-master" data-key="${key}" title="Copy with AI preface">📋 Copy for AI</button>
   <button class="src-action" data-action="add-entry"   data-key="${key}" title="Add entry to selected list" disabled>➕ Add Entry</button>
   <button class="src-action" data-action="from-comps"  data-key="${key}" title="Load from configured compendiums">🔄 From Comps</button>
-  <button class="src-action" data-action="library-use" data-key="${key}" title="Choose sources for Copy All">📚 Library to Use</button>
   <button class="src-action" data-action="do-export"   data-key="${key}" title="Export as JSON">⬇ Export</button>
   <button class="src-action" data-action="do-import"   data-key="${key}" title="Import from JSON">⬆ Import</button>
 </div>
@@ -147,53 +151,179 @@ ${ignoreSection}
   }
 
   _buildSettingRulesPane() {
-    return `<div id="sbi-sr-pane">
-  <h3>Setting Rules</h3>
-  <p style="font-size:12px;">Define character creation rules for your campaign setting. The active rule set is included in <strong>📋 Copy All for AI</strong>.</p>
+    const groupOrder = ['core', 'setting', 'optional', 'params'];
+    const groupLabels = {
+      core: 'Core Setting Rules',
+      setting: 'Setting-Specific Rules',
+      optional: 'Optional Rules',
+      params: 'Character Creation Parameters',
+    };
+    const groupHelps = {
+      core: 'Official SWADE Adventure Edition setting rules that modify character creation and gameplay.',
+      setting: 'Rules for settings that use Frameworks (classes/archetypes) or Factions.',
+      optional: 'Optional rules that add granularity (encumbrance, minimum strength, wealth system).',
+      params: 'Numeric/text parameters that define the starting power level of characters.',
+    };
 
-  <div id="sbi-sr-picker" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;"></div>
+    // Render one rule (boolean checkbox or parameter input). Help button lives
+    // OUTSIDE the <label> so clicking it never toggles the checkbox.
+    const renderRule = (rule) => {
+      const id = `sr-${rule.key}`;
+      const helpId = `sr-help-${rule.key}`;
+      let head;
+      if (rule.type === 'boolean') {
+        head = `<input type="checkbox" id="${id}" data-key="${rule.key}" style="flex-shrink:0;margin-top:2px;">
+          <label for="${id}" class="sr-rule-label">${rule.label}</label>`;
+      } else {
+        const inputType = rule.type === 'number' ? 'number' : 'text';
+        const min = rule.min != null ? `min="${rule.min}"` : '';
+        const max = rule.max != null ? `max="${rule.max}"` : '';
+        const style = rule.type === 'number' ? 'width:80px' : 'flex:1;min-width:200px';
+        const placeholder = rule.type === 'number' ? '' : 'placeholder="e.g. Initiate, Adept, Master..."';
+        head = `<label for="${id}" class="sr-rule-label">${rule.label}</label>
+          <input type="${inputType}" id="${id}" data-key="${rule.key}" ${min} ${max} style="${style}" ${placeholder}>`;
+      }
+      return `<div class="sr-rule-item">
+        <div class="sr-rule-head">
+          ${head}
+          <button type="button" class="sr-help-btn" data-help="${helpId}" title="${escHtml(rule.help)}">ⓘ</button>
+        </div>
+        <div class="sr-help-text" id="${helpId}">${escHtml(rule.help)}</div>
+      </div>`;
+    };
 
-  <div id="sbi-sr-fields">
-    <div class="fg">
-      <label style="min-width:160px;">Attribute Points at Creation:</label>
-      <input type="number" id="sr-attr-pts" min="1" max="20" value="5" style="width:60px;"/>
-    </div>
-    <div class="fg">
-      <label style="min-width:160px;">Skill Points at Creation:</label>
-      <input type="number" id="sr-skill-pts" min="1" max="50" value="12" style="width:60px;"/>
-    </div>
-    <div class="fg" style="flex-direction:column;align-items:flex-start;">
-      <label style="margin-bottom:4px;">Core Skills (start at d4 free, one per line):</label>
-      <textarea id="sr-core-skills" rows="5" style="width:100%;box-sizing:border-box;font-size:11px;resize:vertical;font-family:monospace;"></textarea>
-    </div>
-    <div class="fg" style="flex-direction:column;align-items:flex-start;">
-      <label style="margin-bottom:4px;">Extra / Homebrew Instructions (freeform notes for the AI):</label>
-      <textarea id="sr-notes" rows="3" style="width:100%;box-sizing:border-box;font-size:11px;resize:vertical;"
-        placeholder="E.g., No Power Points rule is active. Starting funds $1000. Extra skill: Hacking (Smarts)."></textarea>
-    </div>
-  </div>
+    let html = '<div id="sbi-sr-pane">';
+    html += '<h3>Setting Rules</h3>';
+    html += '<p style="font-size:12px;">Define character creation rules for your campaign setting. The active rule set is included in <strong>📋 Copy All for AI</strong>.</p>';
 
-  <div id="sbi-sr-ro-notice" style="display:none;font-size:11px;color:var(--fg-muted);margin:4px 0 8px;">
-    📖 Default rules — these values are read-only. Create a new set to customize.
-  </div>
+    // Rule set picker
+    html += '<div id="sbi-sr-picker" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;"></div>';
 
-  <div id="sbi-sr-mgmt" style="display:none;display:flex;gap:6px;margin:6px 0;">
-    <button type="button" id="sr-save-btn">💾 Save</button>
-    <button type="button" id="sr-rename-btn">✏️ Rename</button>
-    <button type="button" id="sr-delete-btn">🗑️ Delete</button>
-  </div>
+    // Linked usage profile
+    html += `<div class="sr-link-box">
+      <label>Linked Usage Profile <select id="sr-linked-profile"></select></label>
+      <span class="sr-link-hint">When set, loading this rule set can also switch the library sources (you'll be asked to confirm).</span>
+    </div>`;
 
-  <hr style="margin:12px 0;opacity:0.3;"/>
-  <h4 style="margin:4px 0;">How to Use Setting Rules</h4>
-  <ul style="font-size:12px;margin:4px 0;padding-left:1.4em;">
-    <li>Select <strong>Default SWADE AE</strong> for standard Adventure Edition rules.</li>
-    <li>Click <strong>➕ New Set</strong> to create setting-specific rules (e.g., "Modern Horror", "Sci-Fi").</li>
-    <li>Edit the values and click <strong>💾 Save</strong>.</li>
-    <li>The active set's values are automatically included in <strong>📋 Copy All for AI</strong>.</li>
-    <li>Only one setting rule set can be active at a time.</li>
-  </ul>
-</div>`;
+    // Read-only notice for default
+    html += `<div id="sbi-sr-ro-notice" style="display:none;font-size:11px;color:var(--fg-muted);margin:4px 0 8px;">📖 Default rules — these values are read-only. Create a new set to customize.</div>`;
+
+    // Scrollable rules container
+    html += '<div class="sr-scroll">';
+
+    for (const grp of groupOrder) {
+      const rules = SETTING_RULE_CATALOG.filter(r => r.group === grp);
+      if (!rules.length) continue;
+
+      html += `<details class="sr-group" open>`;
+      html += `<summary class="sr-group-summary">`;
+      html += `<span>${groupLabels[grp]}</span>`;
+      html += `<span class="sr-group-help">${groupHelps[grp]}</span>`;
+      html += `</summary>`;
+      html += `<div class="sr-group-body">`;
+      for (const rule of rules) html += renderRule(rule);
+      html += `</div></details>`;
+    }
+
+    // Freeform / Homebrew group — ALWAYS kept (Core Skills + extra notes)
+    html += `<details class="sr-group" open>`;
+    html += `<summary class="sr-group-summary"><span>Core Skills &amp; Homebrew (Freeform)</span><span class="sr-group-help">Editable reference text included in the AI prompt.</span></summary>`;
+    html += `<div class="sr-group-body">`;
+    html += `<label class="sr-rule-label" for="sr-core-skills" style="margin-bottom:2px;">Core Skills (start at d4 free, one per line):</label>`;
+    html += `<textarea id="sr-core-skills" rows="5" placeholder="Athletics (Agility d4)&#10;Common Knowledge (Smarts d4)&#10;..."></textarea>`;
+    html += `<label class="sr-rule-label" for="sr-notes" style="margin-top:6px;margin-bottom:2px;">Extra / Homebrew Instructions (freeform notes for the AI):</label>`;
+    html += `<textarea id="sr-notes" rows="3" placeholder="E.g., No Power Points rule is active. Starting funds $1000. Extra skill: Hacking (Smarts)."></textarea>`;
+    html += `</div></details>`;
+
+    html += '</div>'; // .sr-scroll
+
+    // Management buttons
+    html += `<div id="sbi-sr-mgmt">
+      <button type="button" id="sr-save-btn">💾 Save</button>
+      <button type="button" id="sr-rename-btn">✏️ Rename</button>
+      <button type="button" id="sr-delete-btn">🗑️ Delete</button>
+    </div>`;
+
+    // Usage help
+    html += `<hr style="margin:12px 0;opacity:0.3;"/>
+    <h4 style="margin:4px 0;">How to Use Setting Rules</h4>
+    <ul style="font-size:12px;margin:4px 0;padding-left:1.4em;">
+      <li>Select <strong>Default SWADE AE</strong> for standard Adventure Edition rules.</li>
+      <li>Click <strong>➕ New Set</strong> to create setting-specific rules (e.g., "Modern Horror", "Sci-Fi").</li>
+      <li>Toggle rules and edit parameters, then click <strong>💾 Save</strong>. Click <strong>ⓘ</strong> for a rule's description.</li>
+      <li>The active set's values are automatically included in <strong>📋 Copy All for AI</strong>.</li>
+      <li>Only one setting rule set can be active at a time.</li>
+    </ul>`;
+
+    html += '</div>';
+    return html;
   }
+
+  // ── Library Sources (Usage Profiles) pane ────────────────────────────
+  _buildProfilesPane() { return `
+<div id="sbi-up-pane">
+  <h3>Library Sources — Usage Profiles</h3>
+  <p style="font-size:12px;">Choose which sources feed each category (Default, Compendium, or Named Lists). Save the selection as a reusable <strong>usage profile</strong> and load it later. The active profile's sources are what <strong>📋 Copy All for AI</strong> uses.</p>
+  <p style="font-size:12px;">Remember that all libraries listed here depend on the compendiums allowed to be searched, defined in the module settings under <strong>“Compendiums to Search”</strong>.
+    <button type="button" id="up-open-comps" class="up-inline-btn" title="Open the Compendiums to Search settings">⚙ Open Compendiums to Search</button></p>
+
+  <div id="sbi-up-picker" class="src-picker"></div>
+
+  <div class="up-meta-box">
+    <label>Profile name <input type="text" id="up-name" placeholder="Profile name"></label>
+    <label>Description <input type="text" id="up-desc" placeholder="Optional description"></label>
+  </div>
+
+  <div class="up-actions">
+    <button type="button" id="up-save-btn">💾 Save Profile</button>
+    <button type="button" id="up-apply-btn">📥 Apply / Load</button>
+    <button type="button" id="up-rename-btn">✏️ Rename</button>
+    <button type="button" id="up-delete-btn">🗑️ Delete</button>
+    <button type="button" id="up-comps-btn">⚙ Compendiums to Search</button>
+  </div>
+
+  <div class="up-link-box">
+    <label>Linked Setting Rule Set <select id="up-rule-set"></select></label>
+    <span class="up-hint">When set, loading this profile can also switch the Setting Rules (you'll be asked to confirm).</span>
+  </div>
+
+  <div class="up-scroll">
+    <table class="up-table">
+      <thead><tr>
+        <th style="text-align:left;">Category</th>
+        <th>Default</th><th>Compendium</th><th>Named Lists</th>
+      </tr></thead>
+      <tbody id="up-tbody"></tbody>
+    </table>
+  </div>
+</div>`; }
+
+  _buildExportImportPane() { return `
+<div id="sbi-ei-pane">
+  <h3>Export / Import</h3>
+  <p style="font-size:12px;">Back up or transfer the module configuration. <strong>Actor data and images are never exported</strong> — they are created by the module but are not part of it.</p>
+
+  <div class="ei-actions">
+    <button type="button" id="ei-export-btn">⬇ Export…</button>
+    <button type="button" id="ei-import-btn">⬆ Import…</button>
+    <button type="button" id="ei-comps-btn">⚙ Compendiums to Search</button>
+  </div>
+
+  <h4>Export presets</h4>
+  <ul style="font-size:12px;line-height:1.6;">
+    <li><strong>Full Backup</strong> — settings, usage profiles, setting rules, compendium data and named lists.</li>
+    <li><strong>Settings only</strong> — module settings + setting rules.</li>
+    <li><strong>Usage Profiles only</strong> — profiles + library source selections.</li>
+    <li><strong>Per category</strong> — choose the tabs to export.</li>
+  </ul>
+
+  <h4>Import</h4>
+  <ul style="font-size:12px;line-height:1.6;">
+    <li>Merge, Replace, or Selective (per category).</li>
+    <li>Optionally apply the imported library sources to your active profile, a chosen profile, or a new profile.</li>
+    <li>The file is <strong>validated first</strong>: you are warned about missing modules/compendiums and informed about new libraries found locally.</li>
+  </ul>
+</div>`; }
 
   _buildHTML() {
     const refPanes = MAIN_REF_CATS.map(key => `
@@ -214,10 +344,12 @@ ${ignoreSection}
     <button type="button" id="sbi-copy-all-btn" title="Copy setting rules + format + all non-ignored lists for AI">📋 Copy All for AI</button>
   </div>
   <div class="h-pane" data-tab="quick-start">${this._buildQuickStart()}</div>
+  <div class="h-pane" data-tab="profiles">${this._buildProfilesPane()}</div>
   <div class="h-pane" data-tab="settings">${this._buildSettings()}</div>
   <div class="h-pane" data-tab="format">${this._buildFormat()}</div>
   <div class="h-pane" data-tab="ai">${this._buildAI()}</div>
   <div class="h-pane" data-tab="setting-rules">${this._buildSettingRulesPane()}</div>
+  <div class="h-pane" data-tab="export-import">${this._buildExportImportPane()}</div>
   ${refPanes}
   <div class="h-pane" data-tab="items">
     <div class="h-sub-tabs">${subTabBtns}</div>
@@ -332,6 +464,7 @@ Current Wealth: 500</pre>`; }
   _buildAI() { return `
 <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
   <button type="button" id="sbi-copy-ai-btn" style="font-size:12px;padding:3px 10px;">📋 Copy AI Instructions</button>
+  <button type="button" id="sbi-copy-sr-btn" style="font-size:12px;padding:3px 10px;" title="Copy only the active setting rules for AI">📐 Copy Setting Rules</button>
   <span style="font-size:10px;opacity:0.6;">(copies only the workflow text below, without the lists)</span>
 </div>
 
@@ -340,8 +473,8 @@ Current Wealth: 500</pre>`; }
 
 <h3>Workflow</h3>
 <ol style="padding-left:1.4em;line-height:1.8;">
-  <li><strong>Define Setting Rules</strong> — go to the <span class="tag">📐 Setting Rules</span> tab. Select the default SWADE AE rules or create a custom rule set for your campaign (modern, sci-fi, fantasy variant, etc.). Only one setting is active at a time.</li>
-  <li><strong>Configure Reference Lists</strong> — use the <span class="tag">📘 Skills</span>, <span class="tag">✦ Edges</span>, <span class="tag">✦ Powers</span>, <span class="tag">✦ Abilities</span>, <span class="tag">⚠ Hindrances</span>, <span class="tag">🧝 Races</span>, and <span class="tag">📦 Items</span> tabs to define what is available in your campaign. Use the Library button to pull from compendiums or your own saved lists. In each tab you can click <strong>📋 Copy for AI</strong> to copy just that list with a preface the AI will understand.</li>
+  <li><strong>Define Setting Rules</strong> — go to the <span class="tag">📐 Setting Rules</span> tab. Select the default SWADE AE rules or create a custom rule set for your campaign (modern, sci-fi, fantasy variant, etc.). Configure Core rules (Born a Hero, Multiple Languages, No Power Points, etc.), Setting-Specific (Frameworks, Factions), Optional rules (Encumbrance, Minimum Strength, Wealth), and Character Creation Parameters (Attribute/Skill points, Extra Perks, Starting Wealth, Rank Names). Only one setting is active at a time.</li>
+  <li><strong>Configure Reference Lists</strong> — use the <span class="tag">🎛️ Library Sources</span> tab to choose which sources feed each category (Default / Compendium / Named Lists) and save them as reusable <em>usage profiles</em>. Then use the <span class="tag">📘 Skills</span>, <span class="tag">✦ Edges</span>, <span class="tag">✦ Powers</span>, <span class="tag">✦ Abilities</span>, <span class="tag">⚠ Hindrances</span>, <span class="tag">🧝 Races</span>, and <span class="tag">📦 Items</span> tabs to edit the lists themselves. In each tab you can click <strong>📋 Copy for AI</strong> to copy just that list with a preface the AI will understand.</li>
   <li><strong>Mark unused tabs as Ignored</strong> — if your setting has no Powers (e.g., a gritty realistic game), click <strong>✓ Include in Copy All for AI</strong> in the Powers tab to toggle it to "excluded." Skills are always included and cannot be excluded.</li>
   <li><strong>Copy everything for AI</strong> — click <strong>📋 Copy All for AI</strong> at the top of this window. This assembles: Setting Rules + Stat Block Format + all non-ignored reference lists into a single clipboard paste.</li>
   <li><strong>Create your character/NPC with AI</strong> — paste the copied instructions into your AI, describe the character you want, and ask for a SWADE stat block in the Pinnacle format.</li>
@@ -440,11 +573,222 @@ Fear, natural claw attack, Hardy. No Edges or Hindrances.</pre>
     this.element.querySelectorAll('.h-sub-tab').forEach(btn =>
       btn.addEventListener('click', () => this._switchItemSub(btn.dataset.subtab)));
     this._setupAITab();
+    this._setupProfilesPane();
+    this._setupExportImportPane();
     this._setupSettingRulesPane();
     for (const key of MAIN_REF_CATS) this._setupRefPane(key);
     for (const sub of ITEM_SUBTYPES)  this._setupRefPane(sub);
     this._switchTab(this._activeTab);
     this._sizeObserver();
+  }
+
+  // ── Confirmation helper ──────────────────────────────────────────────
+  async _confirm(title, html) {
+    const res = await foundry.applications.api.DialogV2.wait({
+      window: { title },
+      content: `<div style="padding:10px;font-size:12px;line-height:1.5;">${html}</div>`,
+      buttons: [
+        { label: 'Confirm', action: 'ok', icon: 'fas fa-check', default: true },
+        { label: 'Cancel',  action: 'cancel', icon: 'fas fa-times' },
+      ], rejectClose: false,
+    });
+    return res === 'ok';
+  }
+
+  // ── Export / Import pane ─────────────────────────────────────────────
+  _setupExportImportPane() {
+    this.element.querySelector('#ei-export-btn')?.addEventListener('click', () => openExport());
+    this.element.querySelector('#ei-import-btn')?.addEventListener('click', () => openImport());
+    this.element.querySelector('#ei-comps-btn')?.addEventListener('click',  () => new SelectCompendiums().render({ force: true }));
+  }
+
+  // ── Library Sources (Usage Profiles) pane ────────────────────────────
+  _setupProfilesPane() {
+    const el = this.element;
+    el.querySelector('#up-save-btn')?.addEventListener('click', () => this._upSave());
+    el.querySelector('#up-apply-btn')?.addEventListener('click', () => this._upApply());
+    el.querySelector('#up-rename-btn')?.addEventListener('click', () => this._upRename());
+    el.querySelector('#up-delete-btn')?.addEventListener('click', () => this._upDelete());
+    el.querySelector('#up-comps-btn')?.addEventListener('click', () => new SelectCompendiums().render({ force: true }));
+    el.querySelector('#up-open-comps')?.addEventListener('click', () => new SelectCompendiums().render({ force: true }));
+    this._rebuildUPPicker();
+  }
+
+  _rebuildUPPicker() {
+    const picker = this.element.querySelector('#sbi-up-picker');
+    if (!picker) return;
+    const profiles = getProfiles();
+    const activeId = profiles.active;
+    const btns = profiles.items.map(p =>
+      `<button class="src-btn${p.id === activeId ? ' active' : ''}" data-upid="${p.id}">${escHtml(p.name)}</button>`);
+    btns.push(`<button class="src-btn src-new" data-upid="__new__">➕ New Profile</button>`);
+    picker.innerHTML = btns.join('');
+    picker.querySelectorAll('.src-btn').forEach(btn =>
+      btn.addEventListener('click', async () => {
+        if (btn.dataset.upid === '__new__') { await this._upCreate(); return; }
+        if (btn.dataset.upid === activeId) { this._loadUPFields(); return; }
+        await this._upLoadProfile(btn.dataset.upid);
+      }));
+    this._loadUPFields();
+  }
+
+  _loadUPFields() {
+    const el = this.element;
+    const profile = getActiveProfile();
+    if (!profile) return;
+    const nameEl = el.querySelector('#up-name');
+    const descEl = el.querySelector('#up-desc');
+    if (nameEl) nameEl.value = profile.name ?? '';
+    if (descEl) descEl.value = profile.description ?? '';
+
+    // Linked rule set select
+    const sel = el.querySelector('#up-rule-set');
+    if (sel) {
+      const sr = getSettingRules();
+      const opts = [`<option value="">— none —</option>`,
+        `<option value="default">📚 Default SWADE AE</option>`,
+        ...(sr.namedSets ?? []).map(s => `<option value="${s.id}">${escHtml(s.name)}</option>`)];
+      sel.innerHTML = opts.join('');
+      sel.value = profile.settingRuleSetId ?? '';
+      sel.onchange = async () => {
+        await saveProfile(profile.id, { settingRuleSetId: sel.value || null });
+        uiInfo('Profile link saved.');
+      };
+    }
+
+    // Table rows
+    const tbody = el.querySelector('#up-tbody');
+    if (!tbody) return;
+    const prefs = profile.prefs ?? {};
+    const row = (cat, subtype, p) => {
+      const label = subtype ? `Items › ${ITEM_SUBTYPE_LABEL[subtype]}` : (CAT_LABEL_PLAIN[cat] ?? cat);
+      const hasComp = !!getCompendiumContent(cat, subtype);
+      const lists = getNamedListsFor(cat, subtype);
+      const hasDefault = hasDefaultContent(cat);
+      return `<tr data-cat="${cat}" data-sub="${subtype ?? ''}">
+        <td class="up-cat">${label}</td>
+        <td>${hasDefault ? `<label><input type="checkbox" class="up-check" data-src="default" ${p.useDefault ? 'checked' : ''}> Default</label>` : '<span style="opacity:.3">—</span>'}</td>
+        <td>${hasComp ? `<label><input type="checkbox" class="up-check" data-src="compendium" ${p.useCompendium ? 'checked' : ''}> Compendium</label>` : '<span style="opacity:.3">—</span>'}</td>
+        <td>${lists.map(l => `<label><input type="checkbox" class="up-check" data-src="list" data-list-id="${l.id}" ${(p.listIds ?? []).includes(l.id) ? 'checked' : ''}> ${escHtml(l.name)}</label>`).join(' ') || '<span style="opacity:.3">—</span>'}</td>
+      </tr>`;
+    };
+    let rows = MAIN_REF_CATS.map(cat => row(cat, null, prefs[cat] ?? {})).join('');
+    rows += ITEM_SUBTYPES.map(sub => row('items', sub, prefs.items?.[sub] ?? {})).join('');
+    tbody.innerHTML = rows;
+  }
+
+  _upCollectPrefs() {
+    const prefs = {};
+    for (const cat of MAIN_REF_CATS) prefs[cat] = { useDefault: false, useCompendium: false, listIds: [] };
+    prefs.items = {};
+    for (const sub of ITEM_SUBTYPES) prefs.items[sub] = { useCompendium: false, listIds: [] };
+    this.element.querySelectorAll('#up-tbody tr[data-cat]').forEach(row => {
+      const cat = row.dataset.cat;
+      const sub = row.dataset.sub || null;
+      const target = sub ? prefs.items[sub] : prefs[cat];
+      if (!target) return;
+      row.querySelectorAll('.up-check').forEach(cb => {
+        if (!cb.checked) return;
+        if (cb.dataset.src === 'default')    target.useDefault = true;
+        if (cb.dataset.src === 'compendium') target.useCompendium = true;
+        if (cb.dataset.src === 'list')       target.listIds.push(cb.dataset.listId);
+      });
+    });
+    return prefs;
+  }
+
+  async _upSave() {
+    const profile = getActiveProfile();
+    if (!profile) return;
+    await saveProfile(profile.id, {
+      name: this.element.querySelector('#up-name')?.value?.trim() || profile.name,
+      description: this.element.querySelector('#up-desc')?.value ?? '',
+      prefs: this._upCollectPrefs(),
+      settingRuleSetId: this.element.querySelector('#up-rule-set')?.value || null,
+    });
+    this._rebuildUPPicker();
+    uiInfo('Profile saved.');
+  }
+
+  async _upCreate() {
+    const name = await this._promptText('New Usage Profile', 'Profile name (e.g. "Fantasy Campaign", "Sci-Fi"):', 'My Profile');
+    if (!name) return;
+    await createProfile(name);
+    this._rebuildUPPicker();
+    uiInfo('Profile created.');
+  }
+
+  async _upLoadProfile(id) {
+    const profile = getProfiles().items.find(p => p.id === id);
+    if (!profile) return;
+    const ok = await this._confirm('Load Usage Profile', `
+      Load <strong>${escHtml(profile.name)}</strong>?<br><br>
+      This replaces the current <strong>library source selection</strong> (Default/Compendium/Named Lists per category).
+      ${profile.settingRuleSetId ? '<br><br>This profile is linked to a Setting Rule Set — you will be asked to switch it.' : ''}`);
+    if (!ok) return;
+
+    await applyProfilePrefs(id);
+
+    if (profile.settingRuleSetId) {
+      const sr = getSettingRules();
+      const set = profile.settingRuleSetId === 'default'
+        ? { name: 'Default SWADE AE' }
+        : (sr.namedSets ?? []).find(s => s.id === profile.settingRuleSetId);
+      if (set) {
+        const applyRules = await this._confirm('Switch Setting Rules?', `Also switch the active Setting Rules to <strong>${escHtml(set.name)}</strong>?`);
+        if (applyRules) await setActiveSettingRuleSet(profile.settingRuleSetId);
+      }
+    }
+
+    this._rebuildUPPicker();
+    this._rebuildSRPicker();
+    uiInfo('Profile loaded.');
+  }
+
+  async _upApply() {
+    const profile = getActiveProfile();
+    if (!profile) return;
+    const ok = await this._confirm('Apply Profile', `Apply <strong>${escHtml(profile.name)}</strong> now? This sets the active library sources${profile.settingRuleSetId ? ' and switches the linked Setting Rule Set' : ''}.`);
+    if (!ok) return;
+    await applyProfile(profile.id);
+    this._rebuildUPPicker();
+    this._rebuildSRPicker();
+    uiInfo('Profile applied.');
+  }
+
+  async _upRename() {
+    const profile = getActiveProfile();
+    if (!profile) return;
+    const newName = await this._promptText('Rename Profile', 'New name:', profile.name);
+    if (!newName || newName === profile.name) return;
+    await renameProfile(profile.id, newName);
+    this._rebuildUPPicker();
+  }
+
+  async _upDelete() {
+    const profile = getActiveProfile();
+    if (!profile) return;
+    if (getProfiles().items.length <= 1) { uiError('You must keep at least one usage profile.'); return; }
+    const ok = await this._confirm('Delete Profile', `Delete <strong>${escHtml(profile.name)}</strong>? This cannot be undone.`);
+    if (!ok) return;
+    await deleteProfile(profile.id);
+    this._rebuildUPPicker();
+    uiInfo('Profile deleted.');
+  }
+
+  // Small text-prompt helper
+  async _promptText(title, label, value = '') {
+    const res = await foundry.applications.api.DialogV2.wait({
+      window: { title },
+      content: `<div style="padding:8px"><label>${label}<br>
+        <input type="text" id="sbi-prompt-text" value="${escHtml(value)}" style="width:100%;margin-top:4px"></label></div>`,
+      buttons: [
+        { label: 'OK', action: 'ok', icon: 'fas fa-check',
+          callback: (ev, btn, dlg) => dlg.element.querySelector('#sbi-prompt-text')?.value?.trim() || null },
+        { label: 'Cancel', action: 'cancel', icon: 'fas fa-times' },
+      ], rejectClose: false,
+    });
+    return res && res !== 'cancel' ? res : null;
   }
 
   // ── Setting Rules pane ───────────────────────────────────────────────
@@ -470,9 +814,25 @@ Fear, natural claw attack, Hardy. No Edges or Hindrances.</pre>
     picker.querySelectorAll('.src-btn').forEach(btn =>
       btn.addEventListener('click', async () => {
         if (btn.dataset.srid === '__new__') { await this._srCreate(); return; }
-        await setActiveSettingRuleSet(btn.dataset.srid);
+        const id = btn.dataset.srid;
+        await setActiveSettingRuleSet(id);
         this._rebuildSRPicker();
         this._loadSRFields();
+        // Offer to apply a linked usage profile
+        const srNow = getSettingRules();
+        const set = id === 'default' ? null : (srNow.namedSets ?? []).find(s => s.id === id);
+        if (set?.libraryProfileId) {
+          const profile = getProfiles().items.find(p => p.id === set.libraryProfileId);
+          if (profile) {
+            const ok = await this._confirm('Apply Linked Library Sources?',
+              `Rule set <strong>${escHtml(set.name)}</strong> is linked to usage profile <strong>${escHtml(profile.name)}</strong>.<br><br>Apply its library sources now?`);
+            if (ok) {
+              await applyProfilePrefs(profile.id);
+              this._rebuildUPPicker();
+              uiInfo('Library sources applied from linked profile.');
+            }
+          }
+        }
       }));
     this._loadSRFields();
   }
@@ -481,18 +841,51 @@ Fear, natural claw attack, Hardy. No Edges or Hindrances.</pre>
     const active  = getActiveSettingRuleSet();
     const isDefault = active.id === 'default';
     const el = k => this.element.querySelector(k);
-    const attrPts = el('#sr-attr-pts');
-    const skillPts = el('#sr-skill-pts');
+
+    // Boolean rules (checkboxes)
+    for (const rule of SETTING_RULE_CATALOG.filter(r => r.type === 'boolean')) {
+      const inp = el(`#sr-${rule.key}`);
+      if (inp) { inp.checked = !!active[rule.key]; inp.disabled = isDefault; }
+    }
+    // Numeric/text params
+    for (const rule of SETTING_RULE_CATALOG.filter(r => r.type !== 'boolean')) {
+      const inp = el(`#sr-${rule.key}`);
+      if (inp) { inp.value = active[rule.key] ?? ''; inp.readOnly = isDefault; }
+    }
+    // Legacy fields
     const coreSkills = el('#sr-core-skills');
     const notes = el('#sr-notes');
-    if (attrPts)   { attrPts.value = active.attrPoints; attrPts.readOnly = isDefault; }
-    if (skillPts)  { skillPts.value = active.skillPoints; skillPts.readOnly = isDefault; }
-    if (coreSkills){ coreSkills.value = active.coreSkills; coreSkills.readOnly = isDefault; }
-    if (notes)     { notes.value = active.notes ?? ''; notes.readOnly = isDefault; }
+    if (coreSkills) { coreSkills.value = active.coreSkills ?? ''; coreSkills.readOnly = isDefault; }
+    if (notes) { notes.value = active.notes ?? ''; notes.readOnly = isDefault; }
+
     const roNotice = el('#sbi-sr-ro-notice');
     if (roNotice) roNotice.style.display = isDefault ? 'block' : 'none';
     const mgmt = el('#sbi-sr-mgmt');
     if (mgmt) mgmt.style.display = isDefault ? 'none' : 'flex';
+
+    // Linked usage profile
+    const linkedSel = el('#sr-linked-profile');
+    if (linkedSel) {
+      const profiles = getProfiles();
+      linkedSel.innerHTML = ['<option value="">— none —</option>',
+        ...profiles.items.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`)].join('');
+      linkedSel.value = active.libraryProfileId ?? '';
+      linkedSel.disabled = isDefault;
+      linkedSel.onchange = async () => {
+        await saveSettingRuleSet(active.id, { libraryProfileId: linkedSel.value || null });
+        uiInfo('Rule set link saved.');
+      };
+    }
+
+    // Wire help toggles
+    this.element.querySelectorAll('.sr-help-btn').forEach(btn => {
+      btn.onclick = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const helpEl = this.element.querySelector(`#${btn.dataset.help}`);
+        if (helpEl) helpEl.style.display = helpEl.style.display === 'none' ? 'block' : 'none';
+      };
+    });
   }
 
   async _srCreate() {
@@ -516,12 +909,27 @@ Fear, natural claw attack, Hardy. No Edges or Hindrances.</pre>
     const active = getActiveSettingRuleSet();
     if (active.id === 'default') return;
     const el = k => this.element.querySelector(k);
-    const data = {
-      attrPoints:  parseInt(el('#sr-attr-pts')?.value  ?? '5'),
-      skillPoints: parseInt(el('#sr-skill-pts')?.value ?? '12'),
-      coreSkills:  el('#sr-core-skills')?.value ?? '',
-      notes:       el('#sr-notes')?.value ?? '',
-    };
+    const data = {};
+
+    // Boolean rules
+    for (const rule of SETTING_RULE_CATALOG.filter(r => r.type === 'boolean')) {
+      data[rule.key] = !!el(`#sr-${rule.key}`)?.checked;
+    }
+    // Numeric/text params
+    for (const rule of SETTING_RULE_CATALOG.filter(r => r.type !== 'boolean')) {
+      const inp = el(`#sr-${rule.key}`);
+      if (!inp) continue;
+      if (rule.type === 'number') {
+        const n = parseInt(inp.value, 10);
+        data[rule.key] = Number.isNaN(n) ? (rule.min ?? 0) : n;
+      } else {
+        data[rule.key] = inp.value ?? '';
+      }
+    }
+    // Legacy fields
+    data.coreSkills = el('#sr-core-skills')?.value ?? '';
+    data.notes = el('#sr-notes')?.value ?? '';
+
     await saveSettingRuleSet(active.id, data);
     uiInfo('Rule set saved.');
   }
@@ -565,13 +973,50 @@ Fear, natural claw attack, Hardy. No Edges or Hindrances.</pre>
     const active = getActiveSettingRuleSet();
     const lines = ['=== CAMPAIGN SETTING RULES ==='];
     lines.push(`Setting: ${active.name}`);
-    lines.push(`Attribute Points at Creation: ${active.attrPoints}`);
-    lines.push(`Skill Points at Creation: ${active.skillPoints}`);
+
+    // Core rules
+    const coreRules = SETTING_RULE_CATALOG.filter(r => r.group === 'core' && r.type === 'boolean');
+    const enabledCore = coreRules.filter(r => active[r.key]);
+    if (enabledCore.length) {
+      lines.push('\n--- Core Setting Rules ---');
+      for (const r of enabledCore) lines.push(`✓ ${r.label}: ${r.help}`);
+    }
+
+    // Setting-specific rules
+    const settingRules = SETTING_RULE_CATALOG.filter(r => r.group === 'setting' && r.type === 'boolean');
+    const enabledSetting = settingRules.filter(r => active[r.key]);
+    if (enabledSetting.length) {
+      lines.push('\n--- Setting-Specific Rules ---');
+      for (const r of enabledSetting) lines.push(`✓ ${r.label}: ${r.help}`);
+    }
+
+    // Optional rules
+    const optionalRules = SETTING_RULE_CATALOG.filter(r => r.group === 'optional' && r.type === 'boolean');
+    const enabledOptional = optionalRules.filter(r => active[r.key]);
+    if (enabledOptional.length) {
+      lines.push('\n--- Optional Rules ---');
+      for (const r of enabledOptional) lines.push(`✓ ${r.label}: ${r.help}`);
+    }
+
+    // Parameters
+    const params = SETTING_RULE_CATALOG.filter(r => r.group === 'params');
+    if (params.length) {
+      lines.push('\n--- Character Creation Parameters ---');
+      for (const r of params) {
+        const val = active[r.key];
+        if (val !== '' && val !== undefined && val !== null) lines.push(`${r.label}: ${val}`);
+      }
+    }
+
+    // Legacy fields
     if (active.coreSkills?.trim()) {
-      lines.push(`Core Skills (start at d4 free):\n${active.coreSkills.trim()}`);
+      lines.push(`\nCore Skills (start at d4 free):\n${active.coreSkills.trim()}`);
     }
     if (active.notes?.trim()) {
-      lines.push(`Extra Instructions / Homebrew:\n${active.notes.trim()}`);
+      lines.push(`\nExtra Instructions / Homebrew:\n${active.notes.trim()}`);
+    }
+    if (!enabledCore.length && !enabledSetting.length && !enabledOptional.length) {
+      lines.push('\nNo optional setting rules are enabled — use standard SWADE Adventure Edition rules.');
     }
     return lines.join('\n');
   }
@@ -695,9 +1140,17 @@ Fear, natural claw attack, Hardy. No Edges or Hindrances.</pre>
       if (!pane) return;
       const clone = pane.cloneNode(true);
       clone.querySelector('#sbi-copy-ai-btn')?.closest('div')?.remove();
+      clone.querySelector('#sbi-copy-sr-btn')?.closest('div')?.remove();
       const text = (clone.textContent ?? '').replace(/\s+/g, ' ').trim();
       try { await navigator.clipboard.writeText(text); uiInfo('AI instructions copied!'); }
       catch { uiError('Copy failed — select all and copy manually.'); }
+    });
+    // Copy Setting Rules only
+    this.element.querySelector('#sbi-copy-sr-btn')?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(this._getActiveSettingRulesText());
+        uiInfo('Setting Rules copied for AI!');
+      } catch { uiError('Copy failed — select all and copy manually.'); }
     });
     // Master copy button (always visible in h-master-bar)
     this.element.querySelector('#sbi-copy-all-btn')?.addEventListener('click', () => this._doCopyAll());
@@ -759,9 +1212,6 @@ Fear, natural claw attack, Hardy. No Edges or Hindrances.</pre>
         }
       } catch(e) { console.error('[SBI] from-comps', e); uiError('Failed to load from compendiums.'); }
       finally { restoreBtn(); }
-
-    } else if (action === 'library-use') {
-      openLibraryUse();
 
     } else if (action === 'do-export') {
       openExport(category);
