@@ -4,6 +4,11 @@
 
 **Import · Export · AI-assisted creation — for Savage Worlds Adventure Edition**
 
+![Stars](https://img.shields.io/github/stars/jacksands/SWADE-Stat-Block-Importer)
+![Issues](https://img.shields.io/github/issues/jacksands/SWADE-Stat-Block-Importer)
+![Último commit](https://img.shields.io/github/last-commit/jacksands/SWADE-Stat-Block-Importer)
+![Licença](https://img.shields.io/github/license/jacksands/SWADE-Stat-Block-Importer)
+
 [![Foundry VTT](https://img.shields.io/badge/Foundry-V14-8b5cf6?style=flat-square)](https://foundryvtt.com)
 [![SWADE](https://img.shields.io/badge/SWADE-6.0.0%2B-c0392b?style=flat-square)](https://peginc.com)
 [![Version](https://img.shields.io/badge/version-2.1.0-d4a574?style=flat-square)](#)
